@@ -11,6 +11,6 @@ fn main() {
     eframe::run_native(
         "Regex Visualiser",
         native_options,
-        Box::new(|cc| Box::new(regex_visualiser::TemplateApp::new(cc))),
+        Box::new(|cc| Box::new(regex_visualiser::Application::new(cc))),
     );
 }
