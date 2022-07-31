@@ -5,7 +5,7 @@ use egui::{
 use regex::{Error as CompileError, Regex};
 use regex_syntax::ast::{Ast, Error as AstError, Span};
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum RegexError {
     Ast(AstError),
     Compiled(CompileError),
@@ -117,17 +117,9 @@ impl eframe::App for Application {
             .show(ctx, |ui| {
                 ui.heading("Regex Debug Info");
                 ui.separator();
-                match &self.regex_output {
-                    Ok((ast, _)) => ui.add(egui::Label::new(
-                        egui::RichText::new(format!("{:?}", ast))
-                            .monospace()
-                            .color(egui::Color32::GRAY),
-                    )),
-                    Err(e) => ui.add(egui::Label::new(
-                        egui::RichText::new(format!("{:?}", e))
-                            .monospace()
-                            .color(egui::Color32::RED),
-                    )),
+
+                if let Ok((ast, _)) = &self.regex_output {
+                    ui.monospace(format!("{:?}", ast));
                 }
             });
 
@@ -141,7 +133,23 @@ impl eframe::App for Application {
                 ui.end_row();
 
                 ui.label("Regex input:");
-                let regex_response =
+
+                let err = self.regex_output.as_ref().err().cloned();
+                let mut old_colors = [Color32::TRANSPARENT; 3];
+
+                if err.is_some() {
+                    let visuals = ui.visuals_mut();
+                    let widgets = &mut visuals.widgets;
+
+                    old_colors = [
+                        std::mem::replace(&mut visuals.selection.stroke.color, Color32::RED),
+                        std::mem::replace(&mut widgets.hovered.bg_stroke.color, Color32::RED),
+                        std::mem::replace(&mut widgets.inactive.bg_stroke.color, Color32::RED),
+                    ];
+                    widgets.inactive.bg_stroke.width = 1.0;
+                }
+
+                let mut regex_response =
                     ui.add(egui::TextEdit::multiline(&mut self.regex_input).layouter(
                         &mut |ui, text, wrap_width| {
                             if text != self.regex_layout.text {
@@ -157,6 +165,23 @@ impl eframe::App for Application {
                             ui.fonts().layout_job(layout_job)
                         },
                     ));
+
+                if let Some(e) = err {
+                    let visuals = ui.visuals_mut();
+                    let widgets = &mut visuals.widgets;
+
+                    visuals.selection.stroke.color = old_colors[0];
+                    widgets.hovered.bg_stroke.color = old_colors[1];
+                    widgets.inactive.bg_stroke.color = old_colors[2];
+                    widgets.inactive.bg_stroke.width = 0.0;
+
+                    regex_response = regex_response.on_hover_text(
+                        egui::RichText::new(e.to_string())
+                            .monospace()
+                            .color(Color32::RED),
+                    );
+                }
+
                 ui.end_row();
 
                 ui.label("Replace with:");
@@ -250,49 +275,7 @@ pub fn regex_layouter(style: &egui::Style, text: String, regex: &RegexOutput) ->
                 )
             }
         }
-        Err(RegexError::Ast(e)) => {
-            let mut layout_job = LayoutJob {
-                text,
-                sections: Vec::with_capacity(3),
-                ..Default::default()
-            };
-
-            let span = e.span();
-
-            layout_job.sections.push(LayoutSection {
-                leading_space: 0.0,
-                byte_range: 0..span.start.offset,
-                format: egui::TextFormat {
-                    color: Color32::RED,
-                    font_id: font_id.clone(),
-                    ..Default::default()
-                },
-            });
-
-            layout_job.sections.push(LayoutSection {
-                leading_space: 0.0,
-                byte_range: span.start.offset..span.end.offset,
-                format: egui::TextFormat {
-                    color: Color32::WHITE,
-                    background: colors::BG_RED,
-                    font_id: font_id.clone(),
-                    ..Default::default()
-                },
-            });
-
-            layout_job.sections.push(LayoutSection {
-                leading_space: 0.0,
-                byte_range: span.end.offset..layout_job.text.len(),
-                format: egui::TextFormat {
-                    color: Color32::RED,
-                    font_id,
-                    ..Default::default()
-                },
-            });
-
-            layout_job
-        }
-        Err(RegexError::Compiled(_)) => LayoutJob::single_section(
+        Err(_) => LayoutJob::single_section(
             text,
             egui::TextFormat {
                 color: Color32::RED,
@@ -305,8 +288,6 @@ pub fn regex_layouter(style: &egui::Style, text: String, regex: &RegexOutput) ->
 
 pub mod colors {
     use egui::Color32;
-    pub const BG_RED: Color32 = Color32::from_rgba_premultiplied(137, 0, 0, 128);
-
     pub const FG_YELLOW: Color32 = Color32::from_rgb(255, 215, 0);
     pub const FG_PINK: Color32 = Color32::from_rgb(218, 112, 214);
     pub const FG_BLUE: Color32 = Color32::from_rgb(23, 159, 255);
