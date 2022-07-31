@@ -59,6 +59,27 @@ impl Application {
         // This is also where you can customized the look at feel of egui using
         // `cc.egui_ctx.set_visuals` and `cc.egui_ctx.set_fonts`.
 
+        let mut fonts = egui::FontDefinitions::default();
+
+        fonts.font_data.insert(
+            "Atkinson-Hyperlegible-Regular".into(),
+            egui::FontData::from_static(include_bytes!(
+                "../assets/fonts/Atkinson-Hyperlegible-Regular-102.ttf"
+            )),
+        );
+
+        fonts
+            .families
+            .get_mut(&egui::FontFamily::Proportional)
+            .unwrap()
+            .insert(0, "Atkinson-Hyperlegible-Regular".to_owned());
+
+        for data in fonts.font_data.values_mut() {
+            data.tweak.scale *= 1.15;
+        }
+
+        cc.egui_ctx.set_fonts(fonts);
+
         // Load previous app state (if any).
         // Note that you must enable the `persistence` feature for this to work.
         if let Some(storage) = cc.storage {
@@ -91,25 +112,24 @@ impl eframe::App for Application {
             });
         });
 
-        egui::SidePanel::right("right").show(ctx, |ui| {
-            ui.heading("Regex Info");
-            ui.separator();
-            match &self.regex_output {
-                Ok((ast, _)) => ui.add(egui::Label::new(
-                    egui::RichText::new(format!("{:?}", ast))
-                        .monospace()
-                        .color(egui::Color32::GRAY),
-                )),
-                Err(e) => ui.add(
-                    egui::Label::new(
+        egui::SidePanel::right("right")
+            .max_width(ctx.available_rect().width() * 0.5)
+            .show(ctx, |ui| {
+                ui.heading("Regex Debug Info");
+                ui.separator();
+                match &self.regex_output {
+                    Ok((ast, _)) => ui.add(egui::Label::new(
+                        egui::RichText::new(format!("{:?}", ast))
+                            .monospace()
+                            .color(egui::Color32::GRAY),
+                    )),
+                    Err(e) => ui.add(egui::Label::new(
                         egui::RichText::new(format!("{:?}", e))
                             .monospace()
                             .color(egui::Color32::RED),
-                    )
-                    .wrap(false),
-                ),
-            }
-        });
+                    )),
+                }
+            });
 
         egui::CentralPanel::default().show(ctx, |ui| {
             egui::Grid::new("grid").num_columns(2).show(ui, |ui| {
@@ -188,13 +208,13 @@ pub fn regex_layouter(style: &egui::Style, text: String, regex: &RegexOutput) ->
                 };
 
                 let mut asts_iter = c.asts.iter().peekable();
-                let mut colors_iter = highlight_colors::get_looping();
+                let mut colors_iter = colors::FOREGROUND_COLORS.into_iter().cycle();
 
                 let mut section = |byte_range: std::ops::Range<usize>| LayoutSection {
                     leading_space: 0.0,
                     byte_range,
                     format: egui::TextFormat {
-                        background: colors_iter.next().unwrap(),
+                        color: colors_iter.next().unwrap(),
                         font_id: font_id.clone(),
                         ..Default::default()
                     },
@@ -223,7 +243,7 @@ pub fn regex_layouter(style: &egui::Style, text: String, regex: &RegexOutput) ->
                 LayoutJob::single_section(
                     text,
                     egui::TextFormat {
-                        background: highlight_colors::RED,
+                        color: colors::FOREGROUND_COLORS[0],
                         font_id,
                         ..Default::default()
                     },
@@ -253,7 +273,8 @@ pub fn regex_layouter(style: &egui::Style, text: String, regex: &RegexOutput) ->
                 leading_space: 0.0,
                 byte_range: span.start.offset..span.end.offset,
                 format: egui::TextFormat {
-                    background: highlight_colors::RED,
+                    color: Color32::WHITE,
+                    background: colors::BG_RED,
                     font_id: font_id.clone(),
                     ..Default::default()
                 },
@@ -282,18 +303,13 @@ pub fn regex_layouter(style: &egui::Style, text: String, regex: &RegexOutput) ->
     }
 }
 
-pub mod highlight_colors {
+pub mod colors {
     use egui::Color32;
-    pub const RED: Color32 = Color32::from_rgba_premultiplied(188, 0, 0, 128);
-    pub const YELLOW: Color32 = Color32::from_rgba_premultiplied(188, 188, 0, 128);
-    pub const GREEN: Color32 = Color32::from_rgba_premultiplied(0, 188, 0, 128);
-    pub const CYAN: Color32 = Color32::from_rgba_premultiplied(0, 188, 188, 128);
-    pub const BLUE: Color32 = Color32::from_rgba_premultiplied(0, 0, 188, 128);
-    pub const MAGENTA: Color32 = Color32::from_rgba_premultiplied(188, 0, 188, 128);
+    pub const BG_RED: Color32 = Color32::from_rgba_premultiplied(137, 0, 0, 128);
 
-    pub fn get_looping() -> impl Iterator<Item = Color32> {
-        [RED, YELLOW, GREEN, CYAN, BLUE, MAGENTA]
-            .into_iter()
-            .cycle()
-    }
+    pub const FG_YELLOW: Color32 = Color32::from_rgb(255, 215, 0);
+    pub const FG_PINK: Color32 = Color32::from_rgb(218, 112, 214);
+    pub const FG_BLUE: Color32 = Color32::from_rgb(23, 159, 255);
+
+    pub const FOREGROUND_COLORS: [Color32; 3] = [FG_BLUE, FG_YELLOW, FG_PINK];
 }
