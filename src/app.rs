@@ -116,7 +116,7 @@ impl eframe::App for Application {
                 ui.separator();
 
                 if let Ok((ast, _)) = &self.regex_output {
-                    ui.monospace(format!("{:?}", ast));
+                    ui.monospace(format!("{:#?}", ast));
                 }
             });
 
