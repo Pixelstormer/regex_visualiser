@@ -1,9 +1,12 @@
+use eframe::{CreationContext, Frame};
 use egui::{
     text::{LayoutJob, LayoutSection},
-    Color32,
+    CentralPanel, Color32, Context, FontData, FontDefinitions, FontFamily, FontSelection, Grid,
+    Layout, RichText, SidePanel, Style, TextEdit, TextFormat, TextStyle, TopBottomPanel,
 };
 use regex::{Error as CompileError, Regex};
-use regex_syntax::ast::{Ast, Error as AstError, Span};
+use regex_syntax::ast::{Ast, Error as AstError, Position, Span};
+use std::fmt::{Display, Formatter};
 
 #[derive(Clone, Debug)]
 pub enum RegexError {
@@ -11,8 +14,8 @@ pub enum RegexError {
     Compiled(CompileError),
 }
 
-impl std::fmt::Display for RegexError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl Display for RegexError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             RegexError::Ast(e) => e.fmt(f),
             RegexError::Compiled(e) => e.fmt(f),
@@ -55,22 +58,19 @@ impl Default for Application {
 
 impl Application {
     /// Called once before the first frame.
-    pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
-        // This is also where you can customized the look at feel of egui using
-        // `cc.egui_ctx.set_visuals` and `cc.egui_ctx.set_fonts`.
-
-        let mut fonts = egui::FontDefinitions::default();
+    pub fn new(cc: &CreationContext<'_>) -> Self {
+        let mut fonts = FontDefinitions::default();
 
         fonts.font_data.insert(
             "Atkinson-Hyperlegible-Regular".into(),
-            egui::FontData::from_static(include_bytes!(
+            FontData::from_static(include_bytes!(
                 "../assets/fonts/Atkinson-Hyperlegible-Regular-102.ttf"
             )),
         );
 
         fonts
             .families
-            .get_mut(&egui::FontFamily::Proportional)
+            .get_mut(&FontFamily::Proportional)
             .unwrap()
             .insert(0, "Atkinson-Hyperlegible-Regular".to_owned());
 
@@ -81,7 +81,6 @@ impl Application {
         cc.egui_ctx.set_fonts(fonts);
 
         // Load previous app state (if any).
-        // Note that you must enable the `persistence` feature for this to work.
         if let Some(storage) = cc.storage {
             return eframe::get_value(storage, eframe::APP_KEY).unwrap_or_default();
         }
@@ -97,10 +96,8 @@ impl eframe::App for Application {
     }
 
     /// Called each time the UI needs repainting, which may be many times per second.
-    /// Put your widgets into a `SidePanel`, `TopPanel`, `CentralPanel`, `Window` or `Area`.
-    fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
-        egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
-            // The top panel is often a good place for a menu bar:
+    fn update(&mut self, ctx: &Context, frame: &mut Frame) {
+        TopBottomPanel::top("menu").show(ctx, |ui| {
             egui::menu::bar(ui, |ui| {
                 ui.menu_button("File", |ui| {
                     if ui.button("Quit").clicked() {
@@ -108,11 +105,11 @@ impl eframe::App for Application {
                     }
                 });
 
-                ui.with_layout(egui::Layout::right_to_left(), egui::warn_if_debug_build);
+                ui.with_layout(Layout::right_to_left(), egui::warn_if_debug_build);
             });
         });
 
-        egui::SidePanel::right("right")
+        SidePanel::right("debug_info")
             .max_width(ctx.available_rect().width() * 0.5)
             .show(ctx, |ui| {
                 ui.heading("Regex Debug Info");
@@ -123,8 +120,8 @@ impl eframe::App for Application {
                 }
             });
 
-        egui::CentralPanel::default().show(ctx, |ui| {
-            egui::Grid::new("grid").num_columns(2).show(ui, |ui| {
+        CentralPanel::default().show(ctx, |ui| {
+            Grid::new("grid").num_columns(2).show(ui, |ui| {
                 ui.label("Text input:");
                 let input_response = ui.text_edit_multiline(&mut self.text_input);
                 if input_response.changed() {
@@ -150,7 +147,7 @@ impl eframe::App for Application {
                 }
 
                 let mut regex_response =
-                    ui.add(egui::TextEdit::multiline(&mut self.regex_input).layouter(
+                    ui.add(TextEdit::multiline(&mut self.regex_input).layouter(
                         &mut |ui, text, wrap_width| {
                             if text != self.regex_layout.text {
                                 self.regex_output = compile_regex(text);
@@ -176,9 +173,7 @@ impl eframe::App for Application {
                     widgets.inactive.bg_stroke.width = 0.0;
 
                     regex_response = regex_response.on_hover_text(
-                        egui::RichText::new(e.to_string())
-                            .monospace()
-                            .color(Color32::RED),
+                        RichText::new(e.to_string()).monospace().color(Color32::RED),
                     );
                 }
 
@@ -220,8 +215,8 @@ pub fn compile_regex(pattern: &str) -> RegexOutput {
     Ok((ast, compiled))
 }
 
-pub fn regex_layouter(style: &egui::Style, text: String, regex: &RegexOutput) -> LayoutJob {
-    let font_id = egui::FontSelection::from(egui::TextStyle::Monospace).resolve(style);
+pub fn regex_layouter(style: &Style, text: String, regex: &RegexOutput) -> LayoutJob {
+    let font_id = FontSelection::from(TextStyle::Monospace).resolve(style);
 
     match regex {
         Ok((ast, _)) => {
@@ -235,31 +230,32 @@ pub fn regex_layouter(style: &egui::Style, text: String, regex: &RegexOutput) ->
                 let mut asts_iter = c.asts.iter().peekable();
                 let mut colors_iter = colors::FOREGROUND_COLORS.into_iter().cycle();
 
-                let mut section = |byte_range: std::ops::Range<usize>| LayoutSection {
-                    leading_space: 0.0,
-                    byte_range,
-                    format: egui::TextFormat {
-                        color: colors_iter.next().unwrap(),
-                        font_id: font_id.clone(),
-                        ..Default::default()
-                    },
+                let mut push_section = |span: &Span| {
+                    layout_job.sections.push(LayoutSection {
+                        leading_space: 0.0,
+                        byte_range: span.start.offset..span.end.offset,
+                        format: TextFormat {
+                            color: colors_iter.next().unwrap(),
+                            font_id: font_id.clone(),
+                            ..Default::default()
+                        },
+                    })
                 };
 
                 let mut literal_start = None;
-                while let Some(ast) = asts_iter.next() {
-                    if let Ast::Literal(_) = ast {
-                        let start_offset = *literal_start.get_or_insert(ast.span().start.offset);
-                        match asts_iter.peek() {
-                            Some(Ast::Literal(_)) => {}
-                            _ => {
-                                let end_offset = ast.span().end.offset;
-                                literal_start = None;
-                                layout_job.sections.push(section(start_offset..end_offset));
-                            }
+                while let (Some(ast), peeked) = (asts_iter.next(), asts_iter.peek()) {
+                    match (ast, peeked) {
+                        (Ast::Literal(_), Some(Ast::Literal(_))) => {}
+                        (Ast::Literal(l), _) => push_section(&l.span.with_start(Position {
+                            offset: literal_start.unwrap_or_default(),
+                            line: 0,
+                            column: 0,
+                        })),
+                        (_, Some(Ast::Literal(l))) => {
+                            literal_start = Some(l.span.start.offset);
+                            push_section(ast.span());
                         }
-                    } else {
-                        let Span { start, end } = ast.span();
-                        layout_job.sections.push(section(start.offset..end.offset));
+                        _ => push_section(ast.span()),
                     }
                 }
 
@@ -267,7 +263,7 @@ pub fn regex_layouter(style: &egui::Style, text: String, regex: &RegexOutput) ->
             } else {
                 LayoutJob::single_section(
                     text,
-                    egui::TextFormat {
+                    TextFormat {
                         color: colors::FOREGROUND_COLORS[0],
                         font_id,
                         ..Default::default()
@@ -277,7 +273,7 @@ pub fn regex_layouter(style: &egui::Style, text: String, regex: &RegexOutput) ->
         }
         Err(_) => LayoutJob::single_section(
             text,
-            egui::TextFormat {
+            TextFormat {
                 color: Color32::RED,
                 font_id,
                 ..Default::default()
