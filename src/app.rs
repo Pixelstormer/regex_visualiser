@@ -2,7 +2,8 @@ use eframe::{CreationContext, Frame};
 use egui::{
     text::{LayoutJob, LayoutSection},
     CentralPanel, Color32, Context, FontData, FontDefinitions, FontFamily, FontSelection, Grid,
-    Layout, RichText, SidePanel, Style, TextEdit, TextFormat, TextStyle, TopBottomPanel,
+    Layout, RichText, ScrollArea, SidePanel, Style, TextEdit, TextFormat, TextStyle,
+    TopBottomPanel,
 };
 use regex::{Error as CompileError, Regex};
 use regex_syntax::ast::{Ast, Error as AstError, Position, Span};
@@ -116,7 +117,7 @@ impl eframe::App for Application {
                 ui.separator();
 
                 if let Ok((ast, _)) = &self.regex_output {
-                    ui.monospace(format!("{:#?}", ast));
+                    ScrollArea::vertical().show(ui, |ui| ui.monospace(format!("{:#?}", ast)));
                 }
             });
 
