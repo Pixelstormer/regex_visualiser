@@ -187,7 +187,10 @@ impl eframe::App for Application {
                 ui.end_row();
 
                 ui.label("Replace with:");
-                let replace_response = ui.text_edit_multiline(&mut self.replace_input);
+                let replace_response = ui.add(
+                    TextEdit::multiline(&mut self.replace_input)
+                        .hint_text(RichText::new("<Empty String>").monospace()),
+                );
                 ui.end_row();
 
                 ui.label("Result:");
