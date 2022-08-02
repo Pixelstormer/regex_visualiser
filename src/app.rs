@@ -54,7 +54,7 @@ impl Default for Application {
             regex_input: Default::default(),
             regex_output: compile_regex(""),
             regex_layout: Default::default(),
-            replace_input: Default::default(),
+            replace_input: "$0".into(),
             replace_output: Default::default(),
         }
     }
