@@ -6,8 +6,11 @@ use egui::{
     TopBottomPanel,
 };
 use regex::{Error as CompileError, Regex};
-use regex_syntax::ast::{Ast, Error as AstError, Position, Span};
-use std::fmt::{Display, Formatter};
+use regex_syntax::ast::{Ast, Error as AstError, Span};
+use std::{
+    fmt::{Display, Formatter},
+    ops::Range,
+};
 
 #[derive(Clone, Debug)]
 pub enum RegexError {
@@ -26,6 +29,16 @@ impl Display for RegexError {
 
 pub type RegexOutput = Result<(Ast, Regex), RegexError>;
 
+pub trait GetRangeExt {
+    fn range(&self) -> Range<usize>;
+}
+
+impl GetRangeExt for Span {
+    fn range(&self) -> Range<usize> {
+        self.start.offset..self.end.offset
+    }
+}
+
 /// We derive Deserialize/Serialize so we can persist app state on shutdown.
 #[derive(serde::Deserialize, serde::Serialize)]
 #[serde(default)] // if we add new fields, give them default values when deserializing old state
@@ -41,6 +54,8 @@ pub struct Application {
     #[serde(skip)]
     regex_layout: LayoutJob,
     #[serde(skip)]
+    group_colors: Vec<Color32>,
+    #[serde(skip)]
     replace_input: String,
     #[serde(skip)]
     replace_output: String,
@@ -54,6 +69,7 @@ impl Default for Application {
             regex_input: Default::default(),
             regex_output: compile_regex(""),
             regex_layout: Default::default(),
+            group_colors: Default::default(),
             replace_input: "$0".into(),
             replace_output: Default::default(),
         }
@@ -148,8 +164,12 @@ impl eframe::App for Application {
                         &mut |ui, text, wrap_width| {
                             if text != self.regex_layout.text {
                                 self.regex_output = compile_regex(text);
-                                self.regex_layout =
-                                    regex_layouter(ui.style(), text.to_owned(), &self.regex_output);
+                                self.regex_layout = regex_layouter(
+                                    ui.style(),
+                                    text.to_owned(),
+                                    &self.regex_output,
+                                    &mut self.group_colors,
+                                );
                             }
                             let mut layout_job = self.regex_layout.clone();
                             layout_job.wrap.max_width = wrap_width;
@@ -176,8 +196,12 @@ impl eframe::App for Application {
                 let input_response = ui.add(TextEdit::multiline(&mut self.text_input).layouter(
                     &mut |ui, text, wrap_width| {
                         if regex_response.changed() || text != self.text_layout.text {
-                            self.text_layout =
-                                input_layouter(ui.style(), text.to_owned(), &self.regex_output);
+                            self.text_layout = input_layouter(
+                                ui.style(),
+                                text.to_owned(),
+                                &self.regex_output,
+                                &self.group_colors,
+                            );
                         }
                         let mut layout_job = self.text_layout.clone();
                         layout_job.wrap.max_width = wrap_width;
@@ -225,7 +249,12 @@ pub fn compile_regex(pattern: &str) -> RegexOutput {
     Ok((ast, compiled))
 }
 
-pub fn input_layouter(style: &Style, text: String, regex: &RegexOutput) -> LayoutJob {
+pub fn input_layouter(
+    style: &Style,
+    text: String,
+    regex: &RegexOutput,
+    capture_colors: &[Color32],
+) -> LayoutJob {
     let font_id = FontSelection::from(TextStyle::Monospace).resolve(style);
 
     match regex {
@@ -233,28 +262,32 @@ pub fn input_layouter(style: &Style, text: String, regex: &RegexOutput) -> Layou
             let mut sections = Vec::new();
             let mut previous_match_end = 0;
 
-            for (m, color) in r
-                .find_iter(&text)
-                .zip(colors::FOREGROUND_COLORS.into_iter().cycle())
-            {
-                if previous_match_end < m.start() {
+            for captures in r.captures_iter(&text) {
+                for (m, color) in captures
+                    .iter()
+                    .skip(1)
+                    .zip(capture_colors)
+                    .filter_map(|(m, c)| m.zip(Some(c)))
+                {
+                    if previous_match_end < m.start() {
+                        sections.push(LayoutSection {
+                            leading_space: 0.0,
+                            byte_range: previous_match_end..m.start(),
+                            format: TextFormat {
+                                font_id: font_id.clone(),
+                                ..Default::default()
+                            },
+                        });
+                    }
+
                     sections.push(LayoutSection {
                         leading_space: 0.0,
-                        byte_range: previous_match_end..m.start(),
-                        format: TextFormat {
-                            font_id: font_id.clone(),
-                            ..Default::default()
-                        },
+                        byte_range: m.range(),
+                        format: TextFormat::simple(font_id.clone(), *color),
                     });
+
+                    previous_match_end = m.end();
                 }
-
-                sections.push(LayoutSection {
-                    leading_space: 0.0,
-                    byte_range: m.range(),
-                    format: TextFormat::simple(font_id.clone(), color),
-                });
-
-                previous_match_end = m.end();
             }
 
             if previous_match_end < text.len() {
@@ -284,7 +317,12 @@ pub fn input_layouter(style: &Style, text: String, regex: &RegexOutput) -> Layou
     }
 }
 
-pub fn regex_layouter(style: &Style, text: String, regex: &RegexOutput) -> LayoutJob {
+pub fn regex_layouter(
+    style: &Style,
+    text: String,
+    regex: &RegexOutput,
+    group_info: &mut Vec<Color32>,
+) -> LayoutJob {
     let font_id = FontSelection::from(TextStyle::Monospace).resolve(style);
 
     match regex {
@@ -292,34 +330,36 @@ pub fn regex_layouter(style: &Style, text: String, regex: &RegexOutput) -> Layou
             if let Ast::Concat(c) = ast {
                 let mut sections = Vec::with_capacity(c.asts.len());
                 let mut asts_iter = c.asts.iter().peekable();
-                let mut colors_iter = colors::FOREGROUND_COLORS.into_iter().cycle();
+                let mut colors_iter = colors::FOREGROUND_COLORS.into_iter().cycle().peekable();
+                group_info.clear();
 
-                let mut push_section = |span: &Span| {
+                let mut literal_start = 0;
+                while let (Some(ast), peeked) = (asts_iter.next(), asts_iter.peek()) {
+                    let range = match (ast, peeked) {
+                        (Ast::Literal(_), Some(Ast::Literal(_))) => continue,
+                        (Ast::Literal(l), _) => Some(literal_start..l.span.range().end),
+                        (Ast::Group(g), _) => {
+                            if g.capture_index().is_some() {
+                                group_info.push(*colors_iter.peek().unwrap());
+                            }
+                            None
+                        }
+                        _ => None,
+                    };
+
+                    if let (None, Some(Ast::Literal(l))) = (&range, peeked) {
+                        literal_start = l.span.start.offset;
+                    }
+
                     sections.push(LayoutSection {
                         leading_space: 0.0,
-                        byte_range: span.start.offset..span.end.offset,
+                        byte_range: range.unwrap_or_else(|| ast.span().range()),
                         format: TextFormat::simple(font_id.clone(), colors_iter.next().unwrap()),
-                    })
-                };
-
-                let mut offset = 0;
-                while let (Some(ast), peeked) = (asts_iter.next(), asts_iter.peek()) {
-                    match (ast, peeked) {
-                        (Ast::Literal(_), Some(Ast::Literal(_))) => {}
-                        (Ast::Literal(l), _) => push_section(&l.span.with_start(Position {
-                            offset,
-                            line: 0,
-                            column: 0,
-                        })),
-                        (_, Some(Ast::Literal(l))) => {
-                            offset = l.span.start.offset;
-                            push_section(ast.span());
-                        }
-                        _ => push_section(ast.span()),
-                    }
+                    });
                 }
 
                 sections.shrink_to_fit();
+                group_info.shrink_to_fit();
 
                 LayoutJob {
                     text,
