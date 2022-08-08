@@ -28,7 +28,7 @@ pub fn compile_regex(pattern: &str) -> anyhow::Result<(Ast, Regex)> {
     Ok((Parser::new().parse(pattern)?, Regex::new(pattern)?))
 }
 
-/// Hold information about how a regular expression should be rendered
+/// Information about how a regular expression should be rendered
 pub struct RegexLayout {
     /// The layout job describing how to render the regular expression text
     job: LayoutJob,
@@ -112,79 +112,89 @@ pub fn layout_regex(regex: String, ast: &Ast, style: &Style) -> RegexLayout {
     )
 }
 
-pub fn input_layouter(
-    style: &Style,
+/// Information about how matched text should be rendered
+pub struct MatchedTextLayout {
+    /// The layout job describing how to render the matched text
+    job: LayoutJob,
+    /// A mapping from the indexes of layout sections in the layout job, to the indexes of layout sections in
+    /// the layout job of the regular expression text, that correspond to the part of the regular expression text
+    /// that matched the corresponding part of the input text
+    capture_group_sections: Vec<Option<usize>>,
+}
+
+impl MatchedTextLayout {
+    pub fn new(job: LayoutJob, capture_group_sections: Vec<Option<usize>>) -> Self {
+        Self {
+            job,
+            capture_group_sections,
+        }
+    }
+}
+
+/// Matches a regex against some text and returns information about how the matched text should be rendered
+pub fn layout_matched_text(
     text: String,
-    regex: &RegexOutput,
-    capture_colors: &[Color32],
-    group_section_indexes: &[Option<usize>],
-    section_index_map: &mut Vec<Option<usize>>,
-) -> LayoutJob {
+    regex: &Regex,
+    style: &Style,
+    regex_layout: &RegexLayout,
+) -> MatchedTextLayout {
     let font_id = FontSelection::from(TextStyle::Monospace).resolve(style);
 
-    match regex {
-        Ok((_, r)) => {
-            let mut new_section_info = Vec::new();
-            let mut sections = Vec::new();
-            let mut previous_match_end = 0;
+    let mut sections = Vec::new();
+    let mut capture_group_sections = Vec::new();
+    let mut previous_match_end = 0;
 
-            for captures in r.captures_iter(&text) {
-                for (m, (color, section)) in captures
-                    .iter()
-                    .skip(1)
-                    .zip(capture_colors)
-                    .zip(group_section_indexes)
-                    .filter_map(|((m, c), s)| m.zip(Some((c, s))))
-                {
-                    if previous_match_end < m.start() {
-                        new_section_info.push(None);
-                        sections.push(LayoutSection {
-                            leading_space: 0.0,
-                            byte_range: previous_match_end..m.start(),
-                            format: TextFormat {
-                                font_id: font_id.clone(),
-                                ..Default::default()
-                            },
-                        });
-                    }
-
-                    new_section_info.push(*section);
-                    sections.push(LayoutSection {
-                        leading_space: 0.0,
-                        byte_range: m.range(),
-                        format: TextFormat::simple(font_id.clone(), *color),
-                    });
-
-                    previous_match_end = m.end();
-                }
-            }
-
-            if previous_match_end < text.len() {
-                new_section_info.push(None);
-                sections.push(LayoutSection {
-                    leading_space: 0.0,
-                    byte_range: previous_match_end..text.len(),
-                    format: TextFormat {
-                        font_id,
-                        ..Default::default()
-                    },
-                });
-            }
-
-            *section_index_map = new_section_info;
-
-            LayoutJob {
-                text,
-                sections,
-                ..Default::default()
-            }
+    // Iterate over all of the capture groups in all of the matches in the given text
+    for (m, s) in regex.captures_iter(&text).flat_map(|c| {
+        c.iter()
+            .skip(1) // Skip the first group as it is always the entire match
+            .zip(regex_layout.capture_group_sections) // Get the regex section indexes for each group
+            .filter_map(|(m, s)| m.zip(Some(s))) // Filter out any groups that didn't participate in the match
+    }) {
+        // Push a section for the text between the previous and current matches,
+        // or on the first iteration, the text between the start of the string and the first match (if any)
+        if previous_match_end < m.start() {
+            capture_group_sections.push(None);
+            sections.push(LayoutSection {
+                leading_space: 0.0,
+                byte_range: previous_match_end..m.start(),
+                format: TextFormat {
+                    font_id: font_id.clone(),
+                    ..Default::default()
+                },
+            });
         }
-        Err(_) => LayoutJob::single_section(
-            text,
-            TextFormat {
+
+        // Push a section for this match
+        capture_group_sections.push(Some(s));
+        sections.push(LayoutSection {
+            leading_space: 0.0,
+            byte_range: m.range(),
+            format: TextFormat::simple(font_id.clone(), regex_layout.job.sections[s].format.color),
+        });
+
+        previous_match_end = m.end();
+    }
+
+    // Push a section for the text between the last match and the end of the string, if any
+    if previous_match_end < text.len() {
+        capture_group_sections.push(None);
+        sections.push(LayoutSection {
+            leading_space: 0.0,
+            byte_range: previous_match_end..text.len(),
+            format: TextFormat {
                 font_id,
                 ..Default::default()
             },
-        ),
+        });
     }
+
+    MatchedTextLayout::new(
+        LayoutJob {
+            text,
+            sections,
+            ..Default::default()
+        },
+        capture_group_sections,
+    )
 }

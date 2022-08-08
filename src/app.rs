@@ -179,7 +179,7 @@ impl eframe::App for Application {
                 let input_result = TextEdit::multiline(&mut self.text_input)
                     .layouter(&mut |ui, text, wrap_width| {
                         if regex_result.response.changed() || text != self.text_layout.text {
-                            self.text_layout = input_layouter(
+                            self.text_layout = layout_matched_text(
                                 ui.style(),
                                 text.to_owned(),
                                 &self.regex_output,
