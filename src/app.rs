@@ -146,7 +146,7 @@ impl eframe::App for Application {
                     .layouter(&mut |ui, text, wrap_width| {
                         if text != self.regex_layout.text {
                             self.regex_output = compile_regex(text);
-                            self.regex_layout = regex_layouter(
+                            self.regex_layout = layout_regex(
                                 ui.style(),
                                 text.to_owned(),
                                 &self.regex_output,

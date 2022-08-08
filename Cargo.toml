@@ -19,6 +19,7 @@ eframe = { version = "0.18.0", features = ["persistence", "dark-light"] }
 serde = { version = "1", features = ["derive"] } # You only need this if you want app persistence
 regex = "1.6.0"
 regex-syntax = "0.6.27"
+anyhow = "1.0.60"
 
 # native:
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
