@@ -260,73 +260,79 @@ fn connecting_lines(
     regex_result: &TextEditOutput,
     input_result: &TextEditOutput,
 ) {
-    if app.regex_compiled.is_ok() {
-        // Only handle a single line of text (for now)
-        if let Some(regex_row) = regex_result.galley.rows.first() {
-            // The regex text is rendered above the input text so the lines should terminate at the bottom of the regex text
-            let regex_y = regex_row.rect.bottom();
+    if app.regex_compiled.is_err() {
+        return;
+    }
 
-            // Calculate the min and max x coordinates of all of the glyphs in each section
-            let mut regex_bounds: Vec<(f32, f32)> =
-                Vec::with_capacity(regex_result.galley.job.sections.len());
-            for glyph in &regex_row.glyphs {
-                let (min, max) = (glyph.pos.x, glyph.pos.x + glyph.size.x);
-                match regex_bounds.get_mut(glyph.section_index as usize) {
-                    Some(bounds) => *bounds = (bounds.0.min(min), bounds.1.max(max)),
-                    None => regex_bounds.push((min, max)),
-                }
-            }
+    // Only handle a single line of text (for now)
+    let regex_row = match regex_result.galley.rows.first() {
+        Some(r) => r,
+        _ => return,
+    };
 
-            if let Some(input_row) = input_result.galley.rows.first() {
-                // The input text is rendered below the regex text so the lines should terminate at the top of the input text
-                let input_y = input_row.rect.top();
+    // The regex text is rendered above the input text so the lines should terminate at the bottom of the regex text
+    let regex_y = regex_row.rect.bottom();
 
-                // Calculate the min and max x coordinates of all of the glyphs in each section
-                let mut input_bounds: Vec<(f32, f32)> =
-                    Vec::with_capacity(input_result.galley.job.sections.len());
-                for glyph in &input_row.glyphs {
-                    let (min, max) = (glyph.pos.x, glyph.pos.x + glyph.size.x);
-                    match input_bounds.get_mut(glyph.section_index as usize) {
-                        Some(bounds) => *bounds = (bounds.0.min(min), bounds.1.max(max)),
-                        None => input_bounds.push((min, max)),
-                    }
-                }
-
-                // `capture_group_sections` determines which sections should have lines drawn between them
-                for (regex_section, input_section) in app
-                    .text_layout
-                    .capture_group_sections
-                    .iter()
-                    .enumerate()
-                    .filter_map(|(r, i)| i.zip(Some(r)))
-                {
-                    // The x coordinates of each end of the line are the midpoints of the corresponding sections.
-                    let (from_min, from_max) = regex_bounds[regex_section];
-                    let from = regex_result.text_draw_pos
-                        + Vec2::new((from_max + from_min) * 0.5, regex_y);
-
-                    let (to_min, to_max) = input_bounds[input_section];
-                    let to =
-                        input_result.text_draw_pos + Vec2::new((to_max + to_min) * 0.5, input_y);
-
-                    // Use cubic bezier lines for a nice looking curve
-                    let control_scale = ((to.y - from.y) / 2.0).max(30.0);
-                    let from_control = from + Vec2::Y * control_scale;
-                    let to_control = to - Vec2::Y * control_scale;
-
-                    let bezier = CubicBezierShape::from_points_stroke(
-                        [from, from_control, to_control, to],
-                        false,
-                        Color32::TRANSPARENT,
-                        Stroke::new(
-                            2.5,
-                            regex_result.galley.job.sections[regex_section].format.color,
-                        ),
-                    );
-
-                    ui.painter().add(bezier);
-                }
-            }
+    // Calculate the min and max x coordinates of all of the glyphs in each section
+    let mut regex_bounds: Vec<(f32, f32)> =
+        Vec::with_capacity(regex_result.galley.job.sections.len());
+    for glyph in &regex_row.glyphs {
+        let (min, max) = (glyph.pos.x, glyph.pos.x + glyph.size.x);
+        match regex_bounds.get_mut(glyph.section_index as usize) {
+            Some(bounds) => *bounds = (bounds.0.min(min), bounds.1.max(max)),
+            None => regex_bounds.push((min, max)),
         }
+    }
+
+    let input_row = match input_result.galley.rows.first() {
+        Some(r) => r,
+        _ => return,
+    };
+
+    // The input text is rendered below the regex text so the lines should terminate at the top of the input text
+    let input_y = input_row.rect.top();
+
+    // Calculate the min and max x coordinates of all of the glyphs in each section
+    let mut input_bounds: Vec<(f32, f32)> =
+        Vec::with_capacity(input_result.galley.job.sections.len());
+    for glyph in &input_row.glyphs {
+        let (min, max) = (glyph.pos.x, glyph.pos.x + glyph.size.x);
+        match input_bounds.get_mut(glyph.section_index as usize) {
+            Some(bounds) => *bounds = (bounds.0.min(min), bounds.1.max(max)),
+            None => input_bounds.push((min, max)),
+        }
+    }
+
+    // `capture_group_sections` determines which sections should have lines drawn between them
+    for (regex_section, input_section) in app
+        .text_layout
+        .capture_group_sections
+        .iter()
+        .enumerate()
+        .filter_map(|(r, i)| i.zip(Some(r)))
+    {
+        // The x coordinates of each end of the line are the midpoints of the corresponding sections.
+        let (from_min, from_max) = regex_bounds[regex_section];
+        let from = regex_result.text_draw_pos + Vec2::new((from_max + from_min) * 0.5, regex_y);
+
+        let (to_min, to_max) = input_bounds[input_section];
+        let to = input_result.text_draw_pos + Vec2::new((to_max + to_min) * 0.5, input_y);
+
+        // Use cubic bezier lines for a nice looking curve
+        let control_scale = ((to.y - from.y) / 2.0).max(30.0);
+        let from_control = from + Vec2::Y * control_scale;
+        let to_control = to - Vec2::Y * control_scale;
+
+        let bezier = CubicBezierShape::from_points_stroke(
+            [from, from_control, to_control, to],
+            false,
+            Color32::TRANSPARENT,
+            Stroke::new(
+                2.5,
+                regex_result.galley.job.sections[regex_section].format.color,
+            ),
+        );
+
+        ui.painter().add(bezier);
     }
 }
