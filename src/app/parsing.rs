@@ -59,10 +59,13 @@ pub fn layout_regex(regex: String, ast: &Ast, style: &Style) -> RegexLayout {
     let mut colors_iter = colors::FOREGROUND_COLORS.into_iter().cycle();
 
     let c = match ast {
+        // If the ast is a concatenation of multiple tokens, those tokens need to be parsed more thoroughly
         Ast::Concat(c) => c,
         a => {
+            // If the ast is only a single token, the highlighting is simple
             let mut sections = Vec::new();
             match a {
+                // If the single token is a capture group, it is equivalent to the whole match
                 Ast::Group(g) if g.capture_index().is_some() => sections.push(0),
                 _ => {}
             }
@@ -71,14 +74,22 @@ pub fn layout_regex(regex: String, ast: &Ast, style: &Style) -> RegexLayout {
     };
 
     let mut asts_iter = c.asts.iter().peekable();
-    let mut sections = Vec::with_capacity(c.asts.len());
     let mut capture_group_sections = Vec::new();
 
+    // There will be at most one section for each token, but usually less because of
+    // chains of consecutive literals being highlighted all together with one section
+    let mut sections = Vec::with_capacity(c.asts.len());
+
     let mut literal_start = 0;
+    // Iterate over the current and next tokens
     while let (Some(ast), peeked) = (asts_iter.next(), asts_iter.peek()) {
+        // Get the byte range to be highlighted
         let range = match (ast, peeked) {
+            // Skip over consecutive literals as only the offsets of the first and last literals in the chain are needed
             (Ast::Literal(_), Some(Ast::Literal(_))) => continue,
+            // At the end of a chain of literals, get the byte range of the whole chain to be highlighted
             (Ast::Literal(l), _) => Some(literal_start..l.span.range().end),
+            // Take note of the indexes of capture groups
             (Ast::Group(g), _) if g.capture_index().is_some() => {
                 capture_group_sections.push(sections.len());
                 None
@@ -86,10 +97,12 @@ pub fn layout_regex(regex: String, ast: &Ast, style: &Style) -> RegexLayout {
             _ => None,
         };
 
+        // Take note of the byte offset of the first literal so that the whole chain can be highlighted later
         if let (None, Some(Ast::Literal(l))) = (&range, peeked) {
             literal_start = l.span.start.offset;
         }
 
+        // Push a section to highlight the determined byte range; either a single token or multiple consecutive literals
         sections.push(LayoutSection {
             leading_space: 0.0,
             byte_range: range.unwrap_or_else(|| ast.span().range()),
