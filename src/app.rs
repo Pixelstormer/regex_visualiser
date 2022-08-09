@@ -93,50 +93,23 @@ impl eframe::App for Application {
 
         SidePanel::right("debug_info")
             .max_width(ctx.available_rect().width() * 0.5)
-            .show(ctx, |ui| debug_info(ui, &self.regex_compiled));
+            .show(ctx, |ui| debug_info(ui, self));
 
         CentralPanel::default().show(ctx, |ui| {
             Grid::new("grid").num_columns(2).show(ui, |ui| {
-                let regex_result = regex_input(
-                    ui,
-                    &mut self.regex_input,
-                    &mut self.regex_compiled,
-                    &mut self.regex_layout,
-                );
+                let regex_result = regex_input(ui, self);
                 ui.end_row();
 
-                let input_result = text_input(
-                    ui,
-                    &mut self.text_input,
-                    &mut self.text_layout,
-                    &self.regex_compiled,
-                    &self.regex_layout,
-                    &regex_result,
-                );
+                let input_result = text_input(ui, self, &regex_result);
                 ui.end_row();
 
-                let replace_response = replace_input(ui, &mut self.replace_input);
+                let replace_response = replace_input(ui, self);
                 ui.end_row();
 
-                result_text(
-                    ui,
-                    &input_result,
-                    &regex_result,
-                    &replace_response,
-                    &mut self.replace_output,
-                    &self.regex_compiled,
-                    &self.text_input,
-                    &self.replace_input,
-                );
+                result_text(ui, self, &regex_result, &input_result, &replace_response);
                 ui.end_row();
 
-                connecting_lines(
-                    ui,
-                    &self.regex_compiled,
-                    &regex_result,
-                    &input_result,
-                    &self.text_layout,
-                );
+                connecting_lines(ui, self, &regex_result, &input_result);
             });
         });
     }
@@ -154,25 +127,19 @@ fn menu_bar(ui: &mut Ui, frame: &mut Frame) {
     });
 }
 
-fn debug_info(ui: &mut Ui, regex: &anyhow::Result<(Ast, Regex)>) {
+fn debug_info(ui: &mut Ui, app: &Application) {
     ui.heading("Regex Debug Info");
     ui.separator();
 
-    if let Ok((ast, _)) = regex {
+    if let Ok((ast, _)) = &app.regex_compiled {
         ScrollArea::vertical().show(ui, |ui| ui.monospace(format!("{:#?}", ast)));
     }
 }
 
-#[allow(clippy::ptr_arg)]
-fn regex_input(
-    ui: &mut Ui,
-    regex_input: &mut String,
-    regex_compiled: &mut anyhow::Result<(Ast, Regex)>,
-    regex_layout: &mut RegexLayout,
-) -> TextEditOutput {
+fn regex_input(ui: &mut Ui, app: &mut Application) -> TextEditOutput {
     ui.label("Regex input:");
 
-    let err = regex_compiled.as_ref().err().map(ToString::to_string);
+    let err = app.regex_compiled.as_ref().err().map(ToString::to_string);
     let mut old_colors = [Color32::TRANSPARENT; 3];
 
     if err.is_some() {
@@ -188,17 +155,17 @@ fn regex_input(
     }
 
     let mut regex_changed = false;
-    let mut regex_result = TextEdit::multiline(regex_input)
+    let mut regex_result = TextEdit::multiline(&mut app.regex_input)
         .layouter(&mut |ui, text, wrap_width| {
             if regex_changed {
-                *regex_compiled = compile_regex(text);
-                *regex_layout = regex_compiled.as_ref().map_or_else(
+                app.regex_compiled = compile_regex(text);
+                app.regex_layout = app.regex_compiled.as_ref().map_or_else(
                     |_| layout_regex_err(text.to_owned(), ui.style()),
                     |(ast, _)| layout_regex(text.to_owned(), ast, ui.style()),
                 );
             }
             regex_changed = true;
-            let mut layout_job = regex_layout.job.clone();
+            let mut layout_job = app.regex_layout.job.clone();
             layout_job.wrap.max_width = wrap_width;
             ui.fonts().layout_job(layout_job)
         })
@@ -221,71 +188,61 @@ fn regex_input(
     regex_result
 }
 
-#[allow(clippy::ptr_arg)]
-fn text_input(
-    ui: &mut Ui,
-    text_input: &mut String,
-    text_layout: &mut MatchedTextLayout,
-    regex_compiled: &anyhow::Result<(Ast, Regex)>,
-    regex_layout: &RegexLayout,
-    regex_result: &TextEditOutput,
-) -> TextEditOutput {
+fn text_input(ui: &mut Ui, app: &mut Application, regex_result: &TextEditOutput) -> TextEditOutput {
     ui.label("Text input:");
     let mut input_changed = false;
-    TextEdit::multiline(text_input)
+    TextEdit::multiline(&mut app.text_input)
         .layouter(&mut |ui, text, wrap_width| {
             if regex_result.response.changed() || input_changed {
-                *text_layout = regex_compiled.as_ref().map_or_else(
+                app.text_layout = app.regex_compiled.as_ref().map_or_else(
                     |_| layout_plain_text(text.to_owned(), ui.style()),
-                    |(_, r)| layout_matched_text(text.to_owned(), r, ui.style(), regex_layout),
+                    |(_, r)| layout_matched_text(text.to_owned(), r, ui.style(), &app.regex_layout),
                 );
             }
             input_changed = true;
-            let mut layout_job = text_layout.job.clone();
+            let mut layout_job = app.text_layout.job.clone();
             layout_job.wrap.max_width = wrap_width;
             ui.fonts().layout_job(layout_job)
         })
         .show(ui)
 }
 
-#[allow(clippy::ptr_arg)]
-fn replace_input(ui: &mut Ui, replace_input: &mut String) -> Response {
+fn replace_input(ui: &mut Ui, app: &mut Application) -> Response {
     ui.label("Replace with:");
     ui.add(
-        TextEdit::multiline(replace_input).hint_text(RichText::new("<Empty String>").monospace()),
+        TextEdit::multiline(&mut app.replace_input)
+            .hint_text(RichText::new("<Empty String>").monospace()),
     )
 }
 
 fn result_text(
     ui: &mut Ui,
-    input_result: &TextEditOutput,
+    app: &mut Application,
     regex_result: &TextEditOutput,
+    input_result: &TextEditOutput,
     replace_response: &Response,
-    replace_output: &mut String,
-    regex_compiled: &anyhow::Result<(Ast, Regex)>,
-    text_input: &str,
-    replace_input: &str,
 ) {
     ui.label("Result:");
     if input_result.response.changed()
         || regex_result.response.changed()
         || replace_response.changed()
     {
-        if let Ok((_, regex)) = regex_compiled {
-            *replace_output = regex.replace_all(text_input, replace_input).into_owned();
+        if let Ok((_, regex)) = &app.regex_compiled {
+            app.replace_output = regex
+                .replace_all(&app.text_input, &app.replace_input)
+                .into_owned();
         }
     }
-    ui.text_edit_multiline(replace_output);
+    ui.text_edit_multiline(&mut app.replace_output);
 }
 
 fn connecting_lines(
     ui: &mut Ui,
-    regex_compiled: &anyhow::Result<(Ast, Regex)>,
+    app: &Application,
     regex_result: &TextEditOutput,
     input_result: &TextEditOutput,
-    text_layout: &MatchedTextLayout,
 ) {
-    if regex_compiled.is_ok() {
+    if app.regex_compiled.is_ok() {
         if let Some(regex_row) = regex_result.galley.rows.first() {
             let regex_y = regex_row.rect.bottom();
             let mut regex_bounds: Vec<(f32, f32)> =
@@ -310,7 +267,8 @@ fn connecting_lines(
                     }
                 }
 
-                for (regex_section, input_section) in text_layout
+                for (regex_section, input_section) in app
+                    .text_layout
                     .capture_group_sections
                     .iter()
                     .enumerate()
