@@ -166,7 +166,7 @@ fn regex_input(ui: &mut Ui, app: &mut Application) -> TextEditOutput {
 
     // If the text gets edited the layouter will be ran again; keep track of this to allow caching state
     let mut regex_changed = false;
-    let mut regex_result = TextEdit::multiline(&mut app.regex_input)
+    let regex_result = TextEdit::multiline(&mut app.regex_input)
         .layouter(&mut |ui, text, wrap_width| {
             if regex_changed {
                 // Recompile and layout the regex if the text was edited
@@ -188,9 +188,10 @@ fn regex_input(ui: &mut Ui, app: &mut Application) -> TextEditOutput {
         replace_textbox_outline_style(ui.visuals_mut(), textbox_outline_style);
 
         // Display the error text
-        regex_result.response = regex_result
-            .response
-            .on_hover_text(RichText::new(e).monospace().color(Color32::RED));
+        egui::Frame::popup(ui.style()).show(ui, |ui| {
+            ui.set_max_width(ui.spacing().tooltip_width);
+            ui.label(RichText::new(e).monospace().color(Color32::RED));
+        });
     }
 
     regex_result
