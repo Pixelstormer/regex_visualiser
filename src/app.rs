@@ -6,7 +6,7 @@ use eframe::{epaint::CubicBezierShape, CreationContext, Frame};
 use egui::{
     text_edit::TextEditOutput, CentralPanel, Color32, Context, FontData, FontDefinitions,
     FontFamily, Grid, Layout, Response, RichText, ScrollArea, SidePanel, Stroke, TextEdit,
-    TopBottomPanel, Ui, Vec2,
+    TopBottomPanel, Ui, Vec2, Visuals,
 };
 use regex::Regex;
 use regex_syntax::ast::Ast;
@@ -115,6 +115,7 @@ impl eframe::App for Application {
     }
 }
 
+/// Renders the menu bar (The thing that is usually toggled by pressing `alt`)
 fn menu_bar(ui: &mut Ui, frame: &mut Frame) {
     egui::menu::bar(ui, |ui| {
         ui.menu_button("File", |ui| {
@@ -127,6 +128,7 @@ fn menu_bar(ui: &mut Ui, frame: &mut Frame) {
     });
 }
 
+/// Pretty-prints the debug output of the regex AST
 fn debug_info(ui: &mut Ui, app: &Application) {
     ui.heading("Regex Debug Info");
     ui.separator();
@@ -136,28 +138,38 @@ fn debug_info(ui: &mut Ui, app: &Application) {
     }
 }
 
+/// Handles the regular expression input and associated state
 fn regex_input(ui: &mut Ui, app: &mut Application) -> TextEditOutput {
     ui.label("Regex input:");
 
-    let err = app.regex_compiled.as_ref().err().map(ToString::to_string);
-    let mut old_colors = [Color32::TRANSPARENT; 3];
-
-    if err.is_some() {
-        let visuals = ui.visuals_mut();
-        let widgets = &mut visuals.widgets;
-
-        old_colors = [
-            std::mem::replace(&mut visuals.selection.stroke.color, Color32::RED),
-            std::mem::replace(&mut widgets.hovered.bg_stroke.color, Color32::RED),
-            std::mem::replace(&mut widgets.inactive.bg_stroke.color, Color32::RED),
-        ];
-        widgets.inactive.bg_stroke.width = 1.0;
+    // If the regex is malformed, adjust the style to give the textbox a red border
+    fn replace_textbox_outline_style(
+        visuals: &mut Visuals,
+        new_values: (Color32, Color32, Color32, f32),
+    ) -> (Color32, Color32, Color32, f32) {
+        (
+            std::mem::replace(&mut visuals.selection.stroke.color, new_values.0),
+            std::mem::replace(&mut visuals.widgets.hovered.bg_stroke.color, new_values.1),
+            std::mem::replace(&mut visuals.widgets.inactive.bg_stroke.color, new_values.2),
+            std::mem::replace(&mut visuals.widgets.inactive.bg_stroke.width, new_values.3),
+        )
     }
 
+    let err = app.regex_compiled.as_ref().err().map(ToString::to_string);
+    let mut textbox_outline_style = Default::default();
+    if err.is_some() {
+        textbox_outline_style = replace_textbox_outline_style(
+            ui.visuals_mut(),
+            (Color32::RED, Color32::RED, Color32::RED, 1.0),
+        );
+    }
+
+    // If the text gets edited the layouter will be ran again; keep track of this to allow caching state
     let mut regex_changed = false;
     let mut regex_result = TextEdit::multiline(&mut app.regex_input)
         .layouter(&mut |ui, text, wrap_width| {
             if regex_changed {
+                // Recompile and layout the regex if the text was edited
                 app.regex_compiled = compile_regex(text);
                 app.regex_layout = app.regex_compiled.as_ref().map_or_else(
                     |_| layout_regex_err(text.to_owned(), ui.style()),
@@ -172,14 +184,10 @@ fn regex_input(ui: &mut Ui, app: &mut Application) -> TextEditOutput {
         .show(ui);
 
     if let Some(e) = &err {
-        let visuals = ui.visuals_mut();
-        let widgets = &mut visuals.widgets;
+        // Restore the prior style to avoid messing up other ui elements that get added after this one
+        replace_textbox_outline_style(ui.visuals_mut(), textbox_outline_style);
 
-        visuals.selection.stroke.color = old_colors[0];
-        widgets.hovered.bg_stroke.color = old_colors[1];
-        widgets.inactive.bg_stroke.color = old_colors[2];
-        widgets.inactive.bg_stroke.width = 0.0;
-
+        // Display the error text
         regex_result.response = regex_result
             .response
             .on_hover_text(RichText::new(e).monospace().color(Color32::RED));
@@ -188,12 +196,16 @@ fn regex_input(ui: &mut Ui, app: &mut Application) -> TextEditOutput {
     regex_result
 }
 
+/// Handles the text input and associated state
 fn text_input(ui: &mut Ui, app: &mut Application, regex_result: &TextEditOutput) -> TextEditOutput {
     ui.label("Text input:");
+
+    // If the text gets edited the layouter will be ran again; keep track of this to allow caching state
     let mut input_changed = false;
     TextEdit::multiline(&mut app.text_input)
         .layouter(&mut |ui, text, wrap_width| {
             if regex_result.response.changed() || input_changed {
+                // Re-layout the text if it or the regex were changed
                 app.text_layout = app.regex_compiled.as_ref().map_or_else(
                     |_| layout_plain_text(text.to_owned(), ui.style()),
                     |(_, r)| layout_matched_text(text.to_owned(), r, ui.style(), &app.regex_layout),
@@ -207,6 +219,7 @@ fn text_input(ui: &mut Ui, app: &mut Application, regex_result: &TextEditOutput)
         .show(ui)
 }
 
+/// Handles the replace text input and associated state
 fn replace_input(ui: &mut Ui, app: &mut Application) -> Response {
     ui.label("Replace with:");
     ui.add(
@@ -215,6 +228,7 @@ fn replace_input(ui: &mut Ui, app: &mut Application) -> Response {
     )
 }
 
+/// Displays the result text from using the regex and replace text to alter the input text
 fn result_text(
     ui: &mut Ui,
     app: &mut Application,
@@ -223,6 +237,8 @@ fn result_text(
     replace_response: &Response,
 ) {
     ui.label("Result:");
+
+    // Re-run the regex replacement if any of the inputs changed
     if input_result.response.changed()
         || regex_result.response.changed()
         || replace_response.changed()
@@ -236,6 +252,7 @@ fn result_text(
     ui.text_edit_multiline(&mut app.replace_output);
 }
 
+/// Renders connecting lines between corresponding parts of the input text and regular expression text
 fn connecting_lines(
     ui: &mut Ui,
     app: &Application,
@@ -243,8 +260,12 @@ fn connecting_lines(
     input_result: &TextEditOutput,
 ) {
     if app.regex_compiled.is_ok() {
+        // Only handle a single line of text (for now)
         if let Some(regex_row) = regex_result.galley.rows.first() {
+            // The regex text is rendered above the input text so the lines should terminate at the bottom of the regex text
             let regex_y = regex_row.rect.bottom();
+
+            // Calculate the min and max x coordinates of all of the glyphs in each section
             let mut regex_bounds: Vec<(f32, f32)> =
                 Vec::with_capacity(regex_result.galley.job.sections.len());
             for glyph in &regex_row.glyphs {
@@ -256,7 +277,10 @@ fn connecting_lines(
             }
 
             if let Some(input_row) = input_result.galley.rows.first() {
+                // The input text is rendered below the regex text so the lines should terminate at the top of the input text
                 let input_y = input_row.rect.top();
+
+                // Calculate the min and max x coordinates of all of the glyphs in each section
                 let mut input_bounds: Vec<(f32, f32)> =
                     Vec::with_capacity(input_result.galley.job.sections.len());
                 for glyph in &input_row.glyphs {
@@ -267,6 +291,7 @@ fn connecting_lines(
                     }
                 }
 
+                // `capture_group_sections` determines which sections should have lines drawn between them
                 for (regex_section, input_section) in app
                     .text_layout
                     .capture_group_sections
@@ -274,6 +299,7 @@ fn connecting_lines(
                     .enumerate()
                     .filter_map(|(r, i)| i.zip(Some(r)))
                 {
+                    // The x coordinates of each end of the line are the midpoints of the corresponding sections.
                     let (from_min, from_max) = regex_bounds[regex_section];
                     let from = regex_result.text_draw_pos
                         + Vec2::new((from_max + from_min) * 0.5, regex_y);
@@ -282,6 +308,7 @@ fn connecting_lines(
                     let to =
                         input_result.text_draw_pos + Vec2::new((to_max + to_min) * 0.5, input_y);
 
+                    // Use cubic bezier lines for a nice looking curve
                     let control_scale = ((to.y - from.y) / 2.0).max(30.0);
                     let from_control = from + Vec2::Y * control_scale;
                     let to_control = to - Vec2::Y * control_scale;

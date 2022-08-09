@@ -59,10 +59,10 @@ pub fn layout_regex(regex: String, ast: &Ast, style: &Style) -> RegexLayout {
     let mut colors_iter = colors::FOREGROUND_COLORS.into_iter().cycle();
 
     let c = match ast {
-        // If the ast is a concatenation of multiple tokens, those tokens need to be parsed more thoroughly
+        // If the AST is a concatenation of multiple tokens, those tokens need to be parsed more thoroughly
         Ast::Concat(c) => c,
         a => {
-            // If the ast is only a single token, the highlighting is simple
+            // If the AST is only a single token, the highlighting is simple
             let mut sections = Vec::new();
             match a {
                 // If the single token is a capture group, it is equivalent to the whole match
