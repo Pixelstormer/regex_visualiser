@@ -1,17 +1,11 @@
 use super::colors;
-use eframe::{epaint::CubicBezierShape, CreationContext, Frame};
 use egui::{
     text::{LayoutJob, LayoutSection},
-    CentralPanel, Color32, Context, FontData, FontDefinitions, FontFamily, FontId, FontSelection,
-    Grid, Layout, Pos2, RichText, ScrollArea, SidePanel, Stroke, Style, TextEdit, TextFormat,
-    TextStyle, TopBottomPanel, Vec2,
+    Color32, FontId, FontSelection, Style, TextFormat, TextStyle,
 };
-use regex::{Error as CompileError, Regex};
-use regex_syntax::ast::{parse::Parser, Ast, Error as AstError, Span};
-use std::{
-    fmt::{Display, Formatter},
-    ops::Range,
-};
+use regex::Regex;
+use regex_syntax::ast::{parse::Parser, Ast, Span};
+use std::ops::Range;
 
 pub trait GetRangeExt {
     fn range(&self) -> Range<usize>;
@@ -29,9 +23,10 @@ pub fn compile_regex(pattern: &str) -> anyhow::Result<(Ast, Regex)> {
 }
 
 /// Information about how a regular expression should be rendered
+#[derive(Default)]
 pub struct RegexLayout {
     /// The layout job describing how to render the regular expression text
-    job: LayoutJob,
+    pub job: LayoutJob,
     /// A mapping from the indexes of capture groups in the regular expression to the indexes of
     /// layout sections in the layout job that correspond to those groups
     capture_group_sections: Vec<usize>,
@@ -46,6 +41,18 @@ impl RegexLayout {
     }
 }
 
+fn regex_simple_layout(
+    text: String,
+    font_id: FontId,
+    color: Color32,
+    capture_group_sections: Vec<usize>,
+) -> RegexLayout {
+    RegexLayout::new(
+        LayoutJob::single_section(text, TextFormat::simple(font_id, color)),
+        capture_group_sections,
+    )
+}
+
 /// Parses the AST of a regular expression and returns information about how it should be rendered
 pub fn layout_regex(regex: String, ast: &Ast, style: &Style) -> RegexLayout {
     let font_id = FontSelection::from(TextStyle::Monospace).resolve(style);
@@ -53,23 +60,13 @@ pub fn layout_regex(regex: String, ast: &Ast, style: &Style) -> RegexLayout {
 
     let c = match ast {
         Ast::Concat(c) => c,
-        Ast::Group(g) if g.capture_index().is_some() => {
-            return RegexLayout::new(
-                LayoutJob::single_section(
-                    regex,
-                    TextFormat::simple(font_id, colors_iter.next().unwrap()),
-                ),
-                vec![0],
-            )
-        }
-        _ => {
-            return RegexLayout::new(
-                LayoutJob::single_section(
-                    regex,
-                    TextFormat::simple(font_id, colors_iter.next().unwrap()),
-                ),
-                vec![],
-            )
+        a => {
+            let mut sections = Vec::new();
+            match a {
+                Ast::Group(g) if g.capture_index().is_some() => sections.push(0),
+                _ => {}
+            }
+            return regex_simple_layout(regex, font_id, colors_iter.next().unwrap(), sections);
         }
     };
 
@@ -112,14 +109,21 @@ pub fn layout_regex(regex: String, ast: &Ast, style: &Style) -> RegexLayout {
     )
 }
 
+/// Returns information about how a malformed regular expression string should be rendered
+pub fn layout_regex_err(regex: String, style: &Style) -> RegexLayout {
+    let font_id = FontSelection::from(TextStyle::Monospace).resolve(style);
+    regex_simple_layout(regex, font_id, Color32::RED, vec![])
+}
+
 /// Information about how matched text should be rendered
+#[derive(Default)]
 pub struct MatchedTextLayout {
     /// The layout job describing how to render the matched text
-    job: LayoutJob,
+    pub job: LayoutJob,
     /// A mapping from the indexes of layout sections in the layout job, to the indexes of layout sections in
     /// the layout job of the regular expression text, that correspond to the part of the regular expression text
     /// that matched the corresponding part of the input text
-    capture_group_sections: Vec<Option<usize>>,
+    pub capture_group_sections: Vec<Option<usize>>,
 }
 
 impl MatchedTextLayout {
@@ -145,11 +149,12 @@ pub fn layout_matched_text(
     let mut previous_match_end = 0;
 
     // Iterate over all of the capture groups in all of the matches in the given text
-    for (m, s) in regex.captures_iter(&text).flat_map(|c| {
+    for (m, &s) in regex.captures_iter(&text).flat_map(|c| {
         c.iter()
             .skip(1) // Skip the first group as it is always the entire match
-            .zip(regex_layout.capture_group_sections) // Get the regex section indexes for each group
+            .zip(&regex_layout.capture_group_sections) // Get the regex section indexes for each group
             .filter_map(|(m, s)| m.zip(Some(s))) // Filter out any groups that didn't participate in the match
+            .collect::<Vec<_>>()
     }) {
         // Push a section for the text between the previous and current matches,
         // or on the first iteration, the text between the start of the string and the first match (if any)
@@ -196,5 +201,19 @@ pub fn layout_matched_text(
             ..Default::default()
         },
         capture_group_sections,
+    )
+}
+
+/// Returns information about how plain text should be rendered without any special treatment
+pub fn layout_plain_text(text: String, style: &Style) -> MatchedTextLayout {
+    MatchedTextLayout::new(
+        LayoutJob::single_section(
+            text,
+            TextFormat {
+                font_id: FontSelection::from(TextStyle::Monospace).resolve(style),
+                ..Default::default()
+            },
+        ),
+        vec![],
     )
 }
