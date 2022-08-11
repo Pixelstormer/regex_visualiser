@@ -142,59 +142,67 @@ fn debug_info(ui: &mut Ui, app: &Application) {
 fn regex_input(ui: &mut Ui, app: &mut Application) -> TextEditOutput {
     ui.label("Regex input:");
 
-    // If the regex is malformed, adjust the style to give the textbox a red border
-    fn replace_textbox_outline_style(
+    // Gets the style elements associated with the outline of textboxes
+    fn textbox_stroke_style(
         visuals: &mut Visuals,
-        new_values: (Color32, Color32, Color32, f32),
-    ) -> (Color32, Color32, Color32, f32) {
+    ) -> (&mut Color32, &mut Color32, &mut Color32, &mut f32) {
         (
-            std::mem::replace(&mut visuals.selection.stroke.color, new_values.0),
-            std::mem::replace(&mut visuals.widgets.hovered.bg_stroke.color, new_values.1),
-            std::mem::replace(&mut visuals.widgets.inactive.bg_stroke.color, new_values.2),
-            std::mem::replace(&mut visuals.widgets.inactive.bg_stroke.width, new_values.3),
+            &mut visuals.selection.stroke.color,
+            &mut visuals.widgets.hovered.bg_stroke.color,
+            &mut visuals.widgets.inactive.bg_stroke.color,
+            &mut visuals.widgets.inactive.bg_stroke.width,
         )
     }
 
-    let err = app.regex_compiled.as_ref().err().map(ToString::to_string);
-    let mut textbox_outline_style = Default::default();
-    if err.is_some() {
-        textbox_outline_style = replace_textbox_outline_style(
-            ui.visuals_mut(),
-            (Color32::RED, Color32::RED, Color32::RED, 1.0),
-        );
+    // Displays the textbox and does the associated state management
+    fn show(ui: &mut Ui, app: &mut Application) -> TextEditOutput {
+        // If the text gets edited the layouter will be ran again; keep track of this to allow caching state
+        let mut regex_changed = false;
+        TextEdit::multiline(&mut app.regex_input)
+            .layouter(&mut |ui, text, wrap_width| {
+                if regex_changed {
+                    // Recompile and layout the regex if the text was edited
+                    app.regex_compiled = compile_regex(text);
+                    app.regex_layout = app.regex_compiled.as_ref().map_or_else(
+                        |_| layout_regex_err(text.to_owned(), ui.style()),
+                        |(ast, _)| layout_regex(text.to_owned(), ast, ui.style()),
+                    );
+                }
+                regex_changed = true;
+                let mut layout_job = app.regex_layout.job.clone();
+                layout_job.wrap.max_width = wrap_width;
+                ui.fonts().layout_job(layout_job)
+            })
+            .show(ui)
     }
 
-    // If the text gets edited the layouter will be ran again; keep track of this to allow caching state
-    let mut regex_changed = false;
-    let regex_result = TextEdit::multiline(&mut app.regex_input)
-        .layouter(&mut |ui, text, wrap_width| {
-            if regex_changed {
-                // Recompile and layout the regex if the text was edited
-                app.regex_compiled = compile_regex(text);
-                app.regex_layout = app.regex_compiled.as_ref().map_or_else(
-                    |_| layout_regex_err(text.to_owned(), ui.style()),
-                    |(ast, _)| layout_regex(text.to_owned(), ast, ui.style()),
-                );
-            }
-            regex_changed = true;
-            let mut layout_job = app.regex_layout.job.clone();
-            layout_job.wrap.max_width = wrap_width;
-            ui.fonts().layout_job(layout_job)
-        })
-        .show(ui);
+    if let Some(e) = app.regex_compiled.as_ref().err().map(ToString::to_string) {
+        // If the regex is malformed, adjust the style to give the textbox a red border
+        let (stroke_a, stroke_b, stroke_c, stroke_width) = textbox_stroke_style(ui.visuals_mut());
+        let old_stroke_a = std::mem::replace(stroke_a, Color32::RED);
+        let old_stroke_b = std::mem::replace(stroke_b, Color32::RED);
+        let old_stroke_c = std::mem::replace(stroke_c, Color32::RED);
+        let old_stroke_width = std::mem::replace(stroke_width, 0.75);
 
-    if let Some(e) = &err {
-        // Restore the prior style to avoid messing up other ui elements that get added after this one
-        replace_textbox_outline_style(ui.visuals_mut(), textbox_outline_style);
+        let result = show(ui, app);
+
+        // Restore the prior style to avoid messing up other ui elements
+        let (stroke_a, stroke_b, stroke_c, stroke_width) = textbox_stroke_style(ui.visuals_mut());
+        *stroke_a = old_stroke_a;
+        *stroke_b = old_stroke_b;
+        *stroke_c = old_stroke_c;
+        *stroke_width = old_stroke_width;
 
         // Display the error text
         egui::Frame::popup(ui.style()).show(ui, |ui| {
-            ui.set_max_width(ui.spacing().tooltip_width);
-            ui.label(RichText::new(e).monospace().color(Color32::RED));
+            ui.label(RichText::new(e).monospace().color(Color32::RED))
         });
-    }
 
-    regex_result
+        result
+    } else {
+        // If the regex is well-formed nothing special needs to be done
+        show(ui, app)
+    }
 }
 
 /// Handles the text input and associated state
