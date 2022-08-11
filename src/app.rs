@@ -176,7 +176,7 @@ fn regex_input(ui: &mut Ui, app: &mut Application) -> TextEditOutput {
             .show(ui)
     }
 
-    if let Some(e) = app.regex_compiled.as_ref().err().map(ToString::to_string) {
+    if let Err(e) = app.regex_compiled.as_ref().map_err(ToString::to_string) {
         // If the regex is malformed, adjust the style to give the textbox a red border
         let (stroke_a, stroke_b, stroke_c, stroke_width) = textbox_stroke_style(ui.visuals_mut());
         let old_stroke_a = std::mem::replace(stroke_a, Color32::RED);
