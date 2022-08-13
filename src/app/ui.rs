@@ -1,13 +1,13 @@
 use super::parsing::*;
 use super::state::{AppState, LogicState};
-use eframe::{epaint::CubicBezierShape, Frame};
+use eframe::epaint::CubicBezierShape;
 use egui::{
     text_edit::TextEditOutput, CentralPanel, Color32, Context, Grid, Layout, Response, RichText,
     ScrollArea, SidePanel, Stroke, TextEdit, TopBottomPanel, Ui, Vec2, Visuals,
 };
 
 /// Displays the entire ui
-pub fn root(state: &mut AppState, ctx: &Context, frame: &mut Frame) {
+pub fn root(state: &mut AppState, ctx: &Context, frame: &mut eframe::Frame) {
     TopBottomPanel::top("menu").show(ctx, |ui| menu_bar(ui, frame));
 
     SidePanel::right("debug_info")
@@ -15,33 +15,42 @@ pub fn root(state: &mut AppState, ctx: &Context, frame: &mut Frame) {
         .show(ctx, |ui| debug_info(ui, state));
 
     CentralPanel::default().show(ctx, |ui| {
-        Grid::new("grid").num_columns(2).show(ui, |ui| {
-            let regex_result = regex_input(ui, state);
-            ui.end_row();
+        ui.horizontal_top(|ui| {
+            Grid::new("grid").num_columns(2).show(ui, |ui| {
+                let regex_result = regex_input(ui, state);
+                ui.end_row();
 
-            let input_result = text_input(ui, state);
-            ui.end_row();
+                let input_result = text_input(ui, state);
+                ui.end_row();
 
-            let replace_response = replace_input(ui, state);
-            ui.end_row();
+                let replace_response = replace_input(ui, state);
+                ui.end_row();
 
-            result_text(
-                ui,
-                state,
-                &regex_result.response,
-                &input_result.response,
-                &replace_response,
-            );
-            ui.end_row();
+                result_text(
+                    ui,
+                    state,
+                    &regex_result.response,
+                    &input_result.response,
+                    &replace_response,
+                );
+                ui.end_row();
 
-            connecting_lines(ui, state, &regex_result, &input_result);
-            ui.end_row();
+                connecting_lines(ui, state, &regex_result, &input_result);
+                ui.end_row();
+            });
+
+            // If the regex is malformed, display the error text besides the textboxes
+            if let Err(e) = &state.logic {
+                egui::Frame::popup(ui.style()).show(ui, |ui| {
+                    ui.label(RichText::new(e.to_string()).monospace().color(Color32::RED))
+                });
+            }
         });
     });
 }
 
 /// Renders the menu bar (The thing that is usually toggled by pressing `alt`)
-fn menu_bar(ui: &mut Ui, frame: &mut Frame) {
+fn menu_bar(ui: &mut Ui, frame: &mut eframe::Frame) {
     egui::menu::bar(ui, |ui| {
         ui.menu_button("File", |ui| {
             if ui.button("Quit").clicked() {
@@ -102,7 +111,7 @@ fn regex_input(ui: &mut Ui, state: &mut AppState) -> TextEditOutput {
             .show(ui)
     }
 
-    if let Err(e) = state.logic.as_ref().map_err(ToString::to_string) {
+    if state.logic.is_err() {
         // If the regex is malformed, adjust the style to give the textbox a red border
         let (stroke_a, stroke_b, stroke_c, stroke_width) = textbox_stroke_style(ui.visuals_mut());
         let old_stroke_a = std::mem::replace(stroke_a, Color32::RED);
@@ -118,11 +127,6 @@ fn regex_input(ui: &mut Ui, state: &mut AppState) -> TextEditOutput {
         *stroke_b = old_stroke_b;
         *stroke_c = old_stroke_c;
         *stroke_width = old_stroke_width;
-
-        // Display the error text
-        egui::Frame::popup(ui.style()).show(ui, |ui| {
-            ui.label(RichText::new(e).monospace().color(Color32::RED))
-        });
 
         result
     } else {
