@@ -1,3 +1,4 @@
+use super::colors::GetColorExt;
 use super::parsing::*;
 use super::state::{AppState, LogicState};
 use eframe::epaint::CubicBezierShape;
@@ -96,8 +97,13 @@ fn regex_input(ui: &mut Ui, state: &mut AppState) -> TextEditOutput {
             .layouter(&mut |ui, text, wrap_width| {
                 if regex_changed {
                     // Recompute relevant state if the text was edited
-                    state.logic =
-                        LogicState::new(text, ui.style(), text, &state.widgets.text_input);
+                    state.logic = LogicState::new(
+                        text,
+                        ui.style(),
+                        text,
+                        &state.widgets.text_input,
+                        state.logic.as_ref().ok(),
+                    );
                 }
                 regex_changed = true;
 
@@ -204,8 +210,8 @@ fn connecting_lines(
     regex_result: &TextEditOutput,
     input_result: &TextEditOutput,
 ) {
-    let capture_group_sections = match &state.logic {
-        Ok(l) => &l.text_layout.capture_group_sections,
+    let layout_section_map = match &state.logic {
+        Ok(l) => &l.text_layout.layout_section_map,
         Err(_) => return,
     };
 
@@ -248,8 +254,8 @@ fn connecting_lines(
         }
     }
 
-    // `capture_group_sections` determines which sections should have lines drawn between them
-    for (regex_section, input_section) in capture_group_sections
+    // `layout_section_map` determines which sections should have lines drawn between them
+    for (regex_section, input_section) in layout_section_map
         .iter()
         .enumerate()
         .filter_map(|(i, r)| r.zip(Some(i)))
@@ -272,7 +278,7 @@ fn connecting_lines(
             Color32::TRANSPARENT,
             Stroke::new(
                 2.5,
-                regex_result.galley.job.sections[regex_section].format.color,
+                regex_result.galley.job.sections[regex_section].get_color(),
             ),
         );
 

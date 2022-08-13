@@ -69,9 +69,15 @@ impl LogicState {
         style: &Style,
         regex_text: impl ToString,
         input_text: impl ToString,
+        previous_state: Option<&Self>,
     ) -> LogicResult {
         compile_regex(pattern).map(|(ast, regex)| {
-            let regex_layout = layout_regex(regex_text.to_string(), &ast, style);
+            let regex_layout = layout_regex(
+                regex_text.to_string(),
+                &ast,
+                style,
+                previous_state.map(|s| &s.regex_layout),
+            );
             let text_layout =
                 layout_matched_text(input_text.to_string(), &regex, style, &regex_layout);
             Self {
