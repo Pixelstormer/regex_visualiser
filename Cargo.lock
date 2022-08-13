@@ -1551,6 +1551,7 @@ dependencies = [
  "console_error_panic_hook",
  "eframe",
  "egui",
+ "lazy_static",
  "regex",
  "regex-syntax",
  "serde",
