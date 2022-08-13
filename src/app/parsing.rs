@@ -1,4 +1,7 @@
-use super::{colors, colors::GetColorExt};
+use super::{
+    colors,
+    colors::{FromBackgroundExt, GetColorExt},
+};
 use egui::{
     text::{LayoutJob, LayoutSection},
     Color32, FontId, FontSelection, Style, TextFormat, TextStyle,
@@ -71,7 +74,7 @@ fn regex_simple_layout(
     capture_group_sections: Vec<usize>,
 ) -> RegexLayout {
     RegexLayout::new(
-        LayoutJob::single_section(text, TextFormat::simple(font_id, color)),
+        LayoutJob::single_section(text, TextFormat::background(font_id, color)),
         capture_group_sections,
     )
 }
@@ -84,7 +87,7 @@ pub fn layout_regex(
     previous_layout: Option<&RegexLayout>,
 ) -> RegexLayout {
     let font_id = FontSelection::from(TextStyle::Monospace).resolve(style);
-    let mut colors_iter = colors::FOREGROUND_COLORS.into_iter().cycle();
+    let mut colors_iter = colors::BACKGROUND_COLORS.into_iter().cycle();
 
     let c = match ast {
         // If the AST is a concatenation of multiple tokens, those tokens need to be parsed more thoroughly
@@ -173,7 +176,7 @@ pub fn layout_regex(
         sections.push(LayoutSection {
             leading_space: 0.0,
             byte_range,
-            format: TextFormat::simple(font_id.clone(), color),
+            format: TextFormat::background(font_id.clone(), color),
         });
     }
 
@@ -255,7 +258,10 @@ pub fn layout_matched_text(
         sections.push(LayoutSection {
             leading_space: 0.0,
             byte_range: m.range(),
-            format: TextFormat::simple(font_id.clone(), regex_layout.job.sections[s].get_color()),
+            format: TextFormat::background(
+                font_id.clone(),
+                regex_layout.job.sections[s].get_color(),
+            ),
         });
 
         previous_match_end = m.end();
