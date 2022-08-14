@@ -1,22 +1,25 @@
 #!/usr/bin/env bash
 set -eu
+
+CRATE_NAME=${PWD##*/} # assume crate name is the same as the folder name
+
 script_path=$( cd "$(dirname "${BASH_SOURCE[0]}")" ; pwd -P )
 cd "$script_path"
 
 OPEN=false
-FAST=false
+OPTIMIZE=false
 
 while test $# -gt 0; do
   case "$1" in
     -h|--help)
-      echo "build_web.sh [--fast] [--open]"
-      echo "  --fast: skip optimization step"
+      echo "build_web.sh [--optimize] [--open]"
+      echo "  --optimize: enable optimization step"
       echo "  --open: open the result in a browser"
       exit 0
       ;;
-    --fast)
+    -O|--optimize)
       shift
-      FAST=true
+      OPTIMIZE=true
       ;;
     --open)
       shift
@@ -28,10 +31,8 @@ while test $# -gt 0; do
   esac
 done
 
-# ./setup_web.sh # <- call this first!
+./setup_web.sh
 
-FOLDER_NAME=${PWD##*/}
-CRATE_NAME=$FOLDER_NAME # assume crate name is the same as the folder name
 CRATE_NAME_SNAKE_CASE="${CRATE_NAME//-/_}" # for those who name crates with-kebab-case
 
 # This is required to enable the web_sys clipboard API which egui_web uses
@@ -54,7 +55,7 @@ TARGET_NAME="${CRATE_NAME_SNAKE_CASE}.wasm"
 WASM_PATH="${TARGET}/wasm32-unknown-unknown/${BUILD}/${TARGET_NAME}"
 wasm-bindgen "${WASM_PATH}" --out-dir docs --no-modules --no-typescript
 
-if [[ "${FAST}" == false ]]; then
+if [[ "${OPTIMIZE}" == true ]]; then
   echo "Optimizing wasm…"
   # to get wasm-opt:  apt/brew/dnf install binaryen
   wasm-opt "docs/${CRATE_NAME}_bg.wasm" -O2 --fast-math -o "docs/${CRATE_NAME}_bg.wasm" # add -g to get debug symbols
@@ -65,12 +66,12 @@ echo "Finished: docs/${CRATE_NAME_SNAKE_CASE}.wasm"
 if [[ "${OPEN}" == true ]]; then
   if [[ "$OSTYPE" == "linux-gnu"* ]]; then
     # Linux, ex: Fedora
-    xdg-open http://localhost:8080/index.html
+    xdg-open http://localhost:8080/index.html#dev
   elif [[ "$OSTYPE" == "msys" ]]; then
     # Windows
-    start http://localhost:8080/index.html
+    start http://localhost:8080/index.html#dev
   else
     # Darwin/MacOS, or something else
-    open http://localhost:8080/index.html
+    open http://localhost:8080/index.html#dev
   fi
 fi
