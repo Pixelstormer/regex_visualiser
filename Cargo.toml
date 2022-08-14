@@ -30,9 +30,6 @@ tracing-subscriber = "0.3"
 console_error_panic_hook = "0.1.6"
 tracing-wasm = "0.2"
 
-# [profile.release]
-# opt-level = 2 # fast and small wasm
-
 # [patch.crates-io]
 
 # If you want to use the bleeding edge version of egui and eframe:
