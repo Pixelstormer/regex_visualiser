@@ -108,7 +108,7 @@ fn regex_input(ui: &mut Ui, state: &mut AppState) -> TextEditOutput {
                 regex_changed = true;
 
                 let mut layout_job = state.logic.as_ref().map_or_else(
-                    |_| layout_regex_err(text.into(), ui.style()).job,
+                    |e| layout_regex_err(text.into(), ui.style(), e).job,
                     |l| l.regex_layout.job.clone(),
                 );
                 layout_job.wrap.max_width = wrap_width;

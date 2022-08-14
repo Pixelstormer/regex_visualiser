@@ -8,7 +8,10 @@ use egui::{
 };
 use regex::Regex;
 use regex_syntax::ast::{parse::Parser, Ast, Span};
-use std::ops::Range;
+use std::{
+    fmt::{Display, Formatter},
+    ops::Range,
+};
 
 pub trait GetRangeExt {
     fn range(&self) -> Range<usize>;
@@ -20,8 +23,35 @@ impl GetRangeExt for Span {
     }
 }
 
+#[derive(Debug)]
+pub enum RegexError {
+    Parse(regex_syntax::ast::Error),
+    Compile(regex::Error),
+}
+
+impl From<regex_syntax::ast::Error> for RegexError {
+    fn from(e: regex_syntax::ast::Error) -> Self {
+        Self::Parse(e)
+    }
+}
+
+impl From<regex::Error> for RegexError {
+    fn from(e: regex::Error) -> Self {
+        Self::Compile(e)
+    }
+}
+
+impl Display for RegexError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            RegexError::Parse(e) => e.fmt(f),
+            RegexError::Compile(e) => e.fmt(f),
+        }
+    }
+}
+
 /// Parses and compiles a regular expression, returning the parsed AST and compiled regex.
-pub fn compile_regex(pattern: &str) -> anyhow::Result<(Ast, Regex)> {
+pub fn compile_regex(pattern: &str) -> Result<(Ast, Regex), RegexError> {
     Ok((Parser::new().parse(pattern)?, Regex::new(pattern)?))
 }
 
@@ -193,9 +223,64 @@ pub fn layout_regex(
 }
 
 /// Returns information about how a malformed regular expression string should be rendered
-pub fn layout_regex_err(regex: String, style: &Style) -> RegexLayout {
+pub fn layout_regex_err(regex: String, style: &Style, err: &RegexError) -> RegexLayout {
     let font_id = FontSelection::from(TextStyle::Monospace).resolve(style);
-    regex_simple_layout(regex, font_id, Color32::RED, vec![0])
+
+    let (span, aux) = match err {
+        RegexError::Parse(e) => (Some(e.span()), e.auxiliary_span()),
+        RegexError::Compile(_) => (None, None),
+    };
+
+    fn plaintext(byte_range: Range<usize>, font_id: FontId) -> LayoutSection {
+        LayoutSection {
+            leading_space: 0.0,
+            byte_range,
+            format: TextFormat::simple(font_id, colors::FG_RED),
+        }
+    }
+
+    fn highlight(byte_range: Range<usize>, font_id: FontId) -> LayoutSection {
+        LayoutSection {
+            leading_space: 0.0,
+            byte_range,
+            format: TextFormat {
+                font_id,
+                color: Color32::WHITE,
+                background: colors::BG_RED,
+                ..Default::default()
+            },
+        }
+    }
+
+    let sections = match (span, aux) {
+        (None, _) => vec![highlight(0..regex.len(), font_id)],
+        (Some(e), None) => vec![
+            plaintext(0..e.start.offset, font_id.clone()),
+            highlight(e.range(), font_id.clone()),
+            plaintext(e.end.offset..regex.len(), font_id),
+        ],
+        (Some(e), Some(a)) => {
+            let min = e.min(a);
+            let max = e.max(a);
+
+            vec![
+                plaintext(0..min.start.offset, font_id.clone()),
+                highlight(min.range(), font_id.clone()),
+                plaintext(min.end.offset..max.start.offset, font_id.clone()),
+                highlight(max.range(), font_id.clone()),
+                plaintext(max.end.offset..regex.len(), font_id),
+            ]
+        }
+    };
+
+    RegexLayout::new(
+        LayoutJob {
+            text: regex,
+            sections,
+            ..Default::default()
+        },
+        vec![0],
+    )
 }
 
 /// Information about how matched text should be rendered

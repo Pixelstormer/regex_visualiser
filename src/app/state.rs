@@ -38,7 +38,7 @@ impl Default for WidgetState {
     }
 }
 
-pub type LogicResult = anyhow::Result<LogicState>;
+pub type LogicResult = Result<LogicState, RegexError>;
 
 /// State for application logic
 pub struct LogicState {
