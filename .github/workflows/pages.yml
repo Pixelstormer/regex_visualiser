@@ -37,15 +37,10 @@ jobs:
           ./build_web.sh --optimize
       - name: Setup Pages
         uses: actions/configure-pages@v1
-      - name: Build with Jekyll
-        uses: actions/jekyll-build-pages@v1
-        with:
-          source: ./docs
-          destination: ./docs/_site
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v1
         with:
-          path: ./docs/_site
+          path: ./docs
 
   # Deployment job
   deploy:
