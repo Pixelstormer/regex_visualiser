@@ -5,6 +5,7 @@ version = "0.1.0"
 authors = ["Pixelstorm <thepixelstormer@gmail.com>"]
 edition = "2021"
 rust-version = "1.60"
+repository = "https://github.com/Pixelstormer/regex_visualiser/"
 
 [[bin]]
 name = "regex_visualiser_bin"
@@ -18,7 +19,7 @@ egui = "0.18.0"
 eframe = { version = "0.18.0", features = ["persistence", "dark-light"] }
 serde = { version = "1", features = ["derive"] } # You only need this if you want app persistence
 regex = "1.6.0"
-regex-syntax = "0.6.27"
+regex-syntax = "0.6.0"
 lazy_static = "1.4.0"
 
 # native:

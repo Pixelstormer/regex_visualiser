@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use egui::{text::LayoutSection, Color32, FontId, TextFormat};
 
 pub const FG_BLUE: Color32 = Color32::from_rgb(23, 159, 255);
