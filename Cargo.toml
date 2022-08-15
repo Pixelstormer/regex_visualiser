@@ -3,9 +3,10 @@ name = "regex_visualiser"
 default-run = "regex_visualiser_bin"
 version = "0.1.0"
 authors = ["Pixelstorm <thepixelstormer@gmail.com>"]
+repository = "https://github.com/Pixelstormer/regex_visualiser/"
+license = "Apache-2.0"
 edition = "2021"
 rust-version = "1.60"
-repository = "https://github.com/Pixelstormer/regex_visualiser/"
 
 [[bin]]
 name = "regex_visualiser_bin"
