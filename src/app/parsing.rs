@@ -322,7 +322,7 @@ pub fn layout_matched_text(
         c.iter()
             .zip(&regex_layout.capture_group_sections) // Get the regex section indexes for each group
             .skip(1) // Skip the first group as it is always the entire match
-            .filter_map(|(m, s)| m.zip(Some(s))) // Filter out any groups that didn't participate in the match
+            .filter_map(|(m, s)| m.filter(|m| !m.range().is_empty()).zip(Some(s))) // Filter out any groups that didn't participate in the match
             .collect::<Vec<_>>()
     }) {
         // Push a section for the text between the previous and current matches,

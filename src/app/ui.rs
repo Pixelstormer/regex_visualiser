@@ -4,7 +4,7 @@ use super::state::{AppState, LogicState};
 use eframe::epaint::CubicBezierShape;
 use egui::{
     text_edit::TextEditOutput, CentralPanel, Color32, Context, Frame, Layout, Response, RichText,
-    ScrollArea, SidePanel, Stroke, TextEdit, TopBottomPanel, Ui, Vec2, Visuals,
+    ScrollArea, SidePanel, Stroke, TextEdit, TopBottomPanel, Ui, Vec2,
 };
 
 /// Displays the entire ui
