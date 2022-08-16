@@ -91,70 +91,42 @@ fn regex_header(ui: &mut Ui) {
 
 /// Handles the regular expression text and associated state
 fn regex_editor(ui: &mut Ui, state: &mut AppState) -> TextEditOutput {
-    /// Gets the style elements associated with the outline of textboxes
-    fn textbox_stroke_style(
-        visuals: &mut Visuals,
-    ) -> (&mut Color32, &mut Color32, &mut Color32, &mut f32) {
-        (
-            &mut visuals.selection.stroke.color,
-            &mut visuals.widgets.hovered.bg_stroke.color,
-            &mut visuals.widgets.inactive.bg_stroke.color,
-            &mut visuals.widgets.inactive.bg_stroke.width,
-        )
-    }
+    // If the text gets edited the layouter will be ran again; keep track of this to enable caching state
+    let mut regex_changed = false;
 
-    /// Displays the textbox and does the associated state management
-    fn show(ui: &mut Ui, state: &mut AppState) -> TextEditOutput {
-        // If the text gets edited the layouter will be ran again; keep track of this to enable caching state
-        let mut regex_changed = false;
-        TextEdit::singleline(&mut state.widgets.regex_text)
-            .desired_width(f32::INFINITY)
-            .margin(Vec2::new(8.0, 4.0))
-            .layouter(&mut |ui, text, wrap_width| {
-                if regex_changed {
-                    // Recompute relevant state if the text was edited
-                    state.logic = LogicState::new(
-                        text,
-                        ui.style(),
-                        text,
-                        &state.widgets.input_text,
-                        state.logic.as_ref().ok(),
+    let frame = Frame::canvas(ui.style());
+    state
+        .logic
+        .as_ref()
+        .map_or_else(|_| frame.stroke(Stroke::new(1.0, Color32::RED)), |_| frame)
+        .show(ui, |ui| {
+            TextEdit::singleline(&mut state.widgets.regex_text)
+                .desired_width(f32::INFINITY)
+                .frame(false)
+                .margin(Vec2::new(8.0, 4.0))
+                .layouter(&mut |ui, text, wrap_width| {
+                    if regex_changed {
+                        // Recompute relevant state if the text was edited
+                        state.logic = LogicState::new(
+                            text,
+                            ui.style(),
+                            text,
+                            &state.widgets.input_text,
+                            state.logic.as_ref().ok(),
+                        );
+                    }
+                    regex_changed = true;
+
+                    let mut layout_job = state.logic.as_ref().map_or_else(
+                        |e| layout_regex_err(text.into(), ui.style(), e).job,
+                        |l| l.regex_layout.job.clone(),
                     );
-                }
-                regex_changed = true;
-
-                let mut layout_job = state.logic.as_ref().map_or_else(
-                    |e| layout_regex_err(text.into(), ui.style(), e).job,
-                    |l| l.regex_layout.job.clone(),
-                );
-                layout_job.wrap.max_width = wrap_width;
-                ui.fonts().layout_job(layout_job)
-            })
-            .show(ui)
-    }
-
-    if state.logic.is_err() {
-        // If the regex is malformed, adjust the style to give the textbox a red border
-        let (stroke_a, stroke_b, stroke_c, stroke_width) = textbox_stroke_style(ui.visuals_mut());
-        let old_stroke_a = std::mem::replace(stroke_a, Color32::RED);
-        let old_stroke_b = std::mem::replace(stroke_b, Color32::RED);
-        let old_stroke_c = std::mem::replace(stroke_c, Color32::RED);
-        let old_stroke_width = std::mem::replace(stroke_width, 0.75);
-
-        let result = show(ui, state);
-
-        // Restore the prior style to avoid messing up other ui elements
-        let (stroke_a, stroke_b, stroke_c, stroke_width) = textbox_stroke_style(ui.visuals_mut());
-        *stroke_a = old_stroke_a;
-        *stroke_b = old_stroke_b;
-        *stroke_c = old_stroke_c;
-        *stroke_width = old_stroke_width;
-
-        result
-    } else {
-        // If the regex is well-formed nothing special needs to be done
-        show(ui, state)
-    }
+                    layout_job.wrap.max_width = wrap_width;
+                    ui.fonts().layout_job(layout_job)
+                })
+                .show(ui)
+        })
+        .inner
 }
 
 /// Displays the header for the input editor
@@ -164,7 +136,7 @@ fn input_header(ui: &mut Ui) {
 
 /// Handles the input text and associated state
 fn input_editor(ui: &mut Ui, state: &mut AppState) -> TextEditOutput {
-    // If the text gets edited the layouter will be ran again; keep track of this to allow caching state
+    // If the text gets edited the layouter will be ran again; keep track of this to enable caching state
     let mut input_changed = false;
     Frame::canvas(ui.style())
         .show(ui, |ui| {
@@ -204,11 +176,15 @@ fn replace_header(ui: &mut Ui) {
 
 /// Handles the replace text and associated state
 fn replace_editor(ui: &mut Ui, state: &mut AppState) -> TextEditOutput {
-    TextEdit::singleline(&mut state.widgets.replace_text)
-        .desired_width(f32::INFINITY)
-        .margin(Vec2::new(8.0, 4.0))
-        .hint_text(RichText::new("<Empty String>").monospace())
-        .show(ui)
+    Frame::canvas(ui.style())
+        .show(ui, |ui| {
+            TextEdit::singleline(&mut state.widgets.replace_text)
+                .desired_width(f32::INFINITY)
+                .margin(Vec2::new(8.0, 4.0))
+                .hint_text(RichText::new("<Empty String>").monospace())
+                .show(ui)
+        })
+        .inner
 }
 
 /// Displays the header for the result body
