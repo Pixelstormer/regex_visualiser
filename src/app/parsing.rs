@@ -141,7 +141,7 @@ pub fn layout_regex(
     // chains of consecutive literals being highlighted all together with one section
     let mut sections = Vec::with_capacity(c.asts.len());
 
-    let mut previous_color = Color32::TRANSPARENT;
+    let mut preceding_color = Color32::TRANSPARENT;
     let mut literal_start = 0;
 
     // Iterate over the current and next tokens
@@ -192,15 +192,16 @@ pub fn layout_regex(
                     if let Some(l) = previous_layout {
                         if let Some(s) = l.get_section_from_group(i as usize) {
                             let next_color = s.get_color();
-                            color = colors_iter.find(|&c| c != previous_color && c != next_color);
+                            color = colors_iter.find(|&c| c != preceding_color && c != next_color);
                         }
                     }
                 }
             }
         }
 
-        let color = color.unwrap_or_else(|| colors_iter.find(|&c| c != previous_color).unwrap());
-        previous_color = color;
+        // If there is no following color, find a color that only avoids clashing with the preceding color
+        let color = color.unwrap_or_else(|| colors_iter.find(|&c| c != preceding_color).unwrap());
+        preceding_color = color;
 
         // Push a section to highlight the determined byte range; either a single token or multiple consecutive literals
         sections.push(LayoutSection {
@@ -283,7 +284,7 @@ pub fn layout_regex_err(regex: String, style: &Style, err: &RegexError) -> Regex
     )
 }
 
-/// Information about how matched text should be rendered
+/// Information about how text that was matched against a regex should be rendered
 #[derive(Default)]
 pub struct MatchedTextLayout {
     /// The layout job describing how to render the matched text
@@ -375,16 +376,13 @@ pub fn layout_matched_text(
     )
 }
 
-/// Returns information about how plain text should be rendered without any special treatment
-pub fn layout_plain_text(text: String, style: &Style) -> MatchedTextLayout {
-    MatchedTextLayout::new(
-        LayoutJob::single_section(
-            text,
-            TextFormat {
-                font_id: FontSelection::from(TextStyle::Monospace).resolve(style),
-                ..Default::default()
-            },
-        ),
-        vec![],
+/// Returns information about how plain text should be rendered
+pub fn layout_plain_text(text: String, style: &Style) -> LayoutJob {
+    LayoutJob::single_section(
+        text,
+        TextFormat {
+            font_id: FontSelection::from(TextStyle::Monospace).resolve(style),
+            ..Default::default()
+        },
     )
 }

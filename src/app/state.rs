@@ -21,19 +21,19 @@ impl Default for AppState {
 
 /// State for egui widgets
 pub struct WidgetState {
-    pub regex_input: String,
-    pub text_input: String,
-    pub replace_input: String,
-    pub replace_output: String,
+    pub regex_text: String,
+    pub input_text: String,
+    pub replace_text: String,
+    pub result_text: String,
 }
 
 impl Default for WidgetState {
     fn default() -> Self {
         Self {
-            regex_input: Default::default(),
-            text_input: Default::default(),
-            replace_input: "$0".into(),
-            replace_output: Default::default(),
+            regex_text: Default::default(),
+            input_text: Default::default(),
+            replace_text: "$0".into(),
+            result_text: Default::default(),
         }
     }
 }
@@ -45,7 +45,7 @@ pub struct LogicState {
     pub ast: Ast,
     pub regex: Regex,
     pub regex_layout: RegexLayout,
-    pub text_layout: MatchedTextLayout,
+    pub input_layout: MatchedTextLayout,
 }
 
 impl Default for LogicState {
@@ -57,7 +57,7 @@ impl Default for LogicState {
             ast: EMPTY_REGEX.0.clone(),
             regex: EMPTY_REGEX.1.clone(),
             regex_layout: Default::default(),
-            text_layout: Default::default(),
+            input_layout: Default::default(),
         }
     }
 }
@@ -78,13 +78,13 @@ impl LogicState {
                 style,
                 previous_state.map(|s| &s.regex_layout),
             );
-            let text_layout =
+            let input_layout =
                 layout_matched_text(input_text.to_string(), &regex, style, &regex_layout);
             Self {
                 ast,
                 regex,
                 regex_layout,
-                text_layout,
+                input_layout,
             }
         })
     }

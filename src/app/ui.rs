@@ -3,54 +3,26 @@ use super::parsing::*;
 use super::state::{AppState, LogicState};
 use eframe::epaint::CubicBezierShape;
 use egui::{
-    text_edit::TextEditOutput, CentralPanel, Color32, Context, Grid, Layout, Response, RichText,
+    text_edit::TextEditOutput, CentralPanel, Color32, Context, Frame, Layout, Response, RichText,
     ScrollArea, SidePanel, Stroke, TextEdit, TopBottomPanel, Ui, Vec2, Visuals,
 };
 
 /// Displays the entire ui
 pub fn root(state: &mut AppState, ctx: &Context, frame: &mut eframe::Frame) {
+    let mut style = (*ctx.style()).clone();
+    style.spacing.item_spacing = Vec2::new(16.0, 6.0);
+    ctx.set_style(style);
+
     TopBottomPanel::top("menu").show(ctx, |ui| menu_bar(ui, frame));
 
     SidePanel::right("debug_info")
         .max_width(ctx.available_rect().width() * 0.5)
-        .show(ctx, |ui| debug_info(ui, state));
+        .show(ctx, |ui| metadata(ui, state));
 
-    CentralPanel::default().show(ctx, |ui| {
-        ui.horizontal_top(|ui| {
-            Grid::new("grid").num_columns(2).show(ui, |ui| {
-                let regex_result = regex_input(ui, state);
-                ui.end_row();
-
-                let input_result = text_input(ui, state);
-                ui.end_row();
-
-                let replace_response = replace_input(ui, state);
-                ui.end_row();
-
-                result_text(
-                    ui,
-                    state,
-                    &regex_result.response,
-                    &input_result.response,
-                    &replace_response,
-                );
-                ui.end_row();
-
-                connecting_lines(ui, state, &regex_result, &input_result);
-                ui.end_row();
-            });
-
-            // If the regex is malformed, display the error text besides the textboxes
-            if let Err(e) = &state.logic {
-                egui::Frame::popup(ui.style()).show(ui, |ui| {
-                    ui.label(RichText::new(e.to_string()).monospace().color(Color32::RED))
-                });
-            }
-        });
-    });
+    CentralPanel::default().show(ctx, |ui| editor(ui, state));
 }
 
-/// Renders the menu bar (The thing that is usually toggled by pressing `alt`)
+/// Displays the menu bar (The thing that is usually toggled by pressing `alt`)
 fn menu_bar(ui: &mut Ui, frame: &mut eframe::Frame) {
     egui::menu::bar(ui, |ui| {
         ui.menu_button("File", |ui| {
@@ -63,21 +35,62 @@ fn menu_bar(ui: &mut Ui, frame: &mut eframe::Frame) {
     });
 }
 
-/// Pretty-prints the debug output of the regex AST
-fn debug_info(ui: &mut Ui, state: &AppState) {
-    ui.heading("Regex Debug Info");
+/// Displays metadata about the regular expression
+fn metadata(ui: &mut Ui, state: &AppState) {
+    ui.heading("Regex Metadata");
     ui.separator();
 
-    if let Ok(l) = &state.logic {
-        ScrollArea::vertical().show(ui, |ui| ui.monospace(format!("{:#?}", l.ast)));
-    }
+    ScrollArea::vertical().show(ui, |ui| match &state.logic {
+        Ok(l) => ui.monospace(format!("{:#?}", l.ast)),
+        Err(e) => ui.label(RichText::new(e.to_string()).monospace().color(Color32::RED)),
+    });
 }
 
-/// Handles the regular expression input and associated state
-fn regex_input(ui: &mut Ui, state: &mut AppState) -> TextEditOutput {
-    ui.label("Regex input:");
+/// Displays the main interactive parts of the UI
+fn editor(ui: &mut Ui, state: &mut AppState) {
+    ScrollArea::vertical().show(ui, |ui| {
+        regex_header(ui);
+        let regex_result = regex_editor(ui, state);
 
-    // Gets the style elements associated with the outline of textboxes
+        input_header(ui);
+        let input_result = ui
+            .allocate_ui_with_layout(
+                ui.available_size() - (ui.max_rect().size() * Vec2::Y * 0.5),
+                Layout::centered_and_justified(ui.layout().main_dir()),
+                |ui| input_editor(ui, state),
+            )
+            .inner;
+
+        replace_header(ui);
+        let replace_result = replace_editor(ui, state);
+
+        result_header(ui);
+        ui.allocate_ui_with_layout(
+            ui.available_size(),
+            Layout::centered_and_justified(ui.layout().main_dir()),
+            |ui| {
+                result_body(
+                    ui,
+                    state,
+                    &regex_result.response,
+                    &input_result.response,
+                    &replace_result.response,
+                )
+            },
+        );
+
+        connecting_lines(ui, state, &regex_result, &input_result);
+    });
+}
+
+/// Displays the header for the regex editor
+fn regex_header(ui: &mut Ui) {
+    ui.label("Regular Expression");
+}
+
+/// Handles the regular expression text and associated state
+fn regex_editor(ui: &mut Ui, state: &mut AppState) -> TextEditOutput {
+    /// Gets the style elements associated with the outline of textboxes
     fn textbox_stroke_style(
         visuals: &mut Visuals,
     ) -> (&mut Color32, &mut Color32, &mut Color32, &mut f32) {
@@ -89,11 +102,13 @@ fn regex_input(ui: &mut Ui, state: &mut AppState) -> TextEditOutput {
         )
     }
 
-    // Displays the textbox and does the associated state management
+    /// Displays the textbox and does the associated state management
     fn show(ui: &mut Ui, state: &mut AppState) -> TextEditOutput {
-        // If the text gets edited the layouter will be ran again; keep track of this to allow caching state
+        // If the text gets edited the layouter will be ran again; keep track of this to enable caching state
         let mut regex_changed = false;
-        TextEdit::multiline(&mut state.widgets.regex_input)
+        TextEdit::singleline(&mut state.widgets.regex_text)
+            .desired_width(f32::INFINITY)
+            .margin(Vec2::new(8.0, 4.0))
             .layouter(&mut |ui, text, wrap_width| {
                 if regex_changed {
                     // Recompute relevant state if the text was edited
@@ -101,7 +116,7 @@ fn regex_input(ui: &mut Ui, state: &mut AppState) -> TextEditOutput {
                         text,
                         ui.style(),
                         text,
-                        &state.widgets.text_input,
+                        &state.widgets.input_text,
                         state.logic.as_ref().ok(),
                     );
                 }
@@ -141,66 +156,88 @@ fn regex_input(ui: &mut Ui, state: &mut AppState) -> TextEditOutput {
     }
 }
 
-/// Handles the text input and associated state
-fn text_input(ui: &mut Ui, state: &mut AppState) -> TextEditOutput {
-    ui.label("Text input:");
+/// Displays the header for the input editor
+fn input_header(ui: &mut Ui) {
+    ui.label("Input Text");
+}
 
+/// Handles the input text and associated state
+fn input_editor(ui: &mut Ui, state: &mut AppState) -> TextEditOutput {
     // If the text gets edited the layouter will be ran again; keep track of this to allow caching state
     let mut input_changed = false;
-    TextEdit::multiline(&mut state.widgets.text_input)
-        .layouter(&mut |ui, text, wrap_width| {
-            if input_changed {
-                if let Ok(logic) = &mut state.logic {
-                    // Re-layout the text if it or the regex were changed
-                    logic.text_layout = layout_matched_text(
-                        text.to_owned(),
-                        &logic.regex,
-                        ui.style(),
-                        &logic.regex_layout,
-                    );
-                }
-            }
-            input_changed = true;
+    Frame::canvas(ui.style())
+        .show(ui, |ui| {
+            TextEdit::multiline(&mut state.widgets.input_text)
+                .desired_width(f32::INFINITY)
+                .frame(false)
+                .layouter(&mut |ui, text, wrap_width| {
+                    if input_changed {
+                        if let Ok(logic) = &mut state.logic {
+                            // Re-layout the text if it or the regex were changed
+                            logic.input_layout = layout_matched_text(
+                                text.to_owned(),
+                                &logic.regex,
+                                ui.style(),
+                                &logic.regex_layout,
+                            );
+                        }
+                    }
+                    input_changed = true;
 
-            let mut layout_job = state.logic.as_ref().map_or_else(
-                |_| layout_plain_text(text.to_owned(), ui.style()).job,
-                |l| l.text_layout.job.clone(),
-            );
-            layout_job.wrap.max_width = wrap_width;
-            ui.fonts().layout_job(layout_job)
+                    let mut layout_job = state.logic.as_ref().map_or_else(
+                        |_| layout_plain_text(text.to_owned(), ui.style()),
+                        |l| l.input_layout.job.clone(),
+                    );
+                    layout_job.wrap.max_width = wrap_width;
+                    ui.fonts().layout_job(layout_job)
+                })
+                .show(ui)
         })
+        .inner
+}
+
+/// Displays the header for the replace editor
+fn replace_header(ui: &mut Ui) {
+    ui.label("Replace With");
+}
+
+/// Handles the replace text and associated state
+fn replace_editor(ui: &mut Ui, state: &mut AppState) -> TextEditOutput {
+    TextEdit::singleline(&mut state.widgets.replace_text)
+        .desired_width(f32::INFINITY)
+        .margin(Vec2::new(8.0, 4.0))
+        .hint_text(RichText::new("<Empty String>").monospace())
         .show(ui)
 }
 
-/// Handles the replace text input and associated state
-fn replace_input(ui: &mut Ui, state: &mut AppState) -> Response {
-    ui.label("Replace with:");
-    ui.add(
-        TextEdit::multiline(&mut state.widgets.replace_input)
-            .hint_text(RichText::new("<Empty String>").monospace()),
-    )
+/// Displays the header for the result body
+fn result_header(ui: &mut Ui) {
+    ui.label("Result Text");
 }
 
 /// Displays the result text from using the regex and replace text to alter the input text
-fn result_text(
+fn result_body(
     ui: &mut Ui,
     state: &mut AppState,
     regex_response: &Response,
     input_response: &Response,
     replace_response: &Response,
 ) {
-    ui.label("Result:");
-
     // Re-run the regex replacement if any of the inputs changed
     if regex_response.changed() || input_response.changed() || replace_response.changed() {
         if let Ok(logic) = &state.logic {
-            state.widgets.replace_output = logic
+            state.widgets.result_text = logic
                 .regex
-                .replace_all(&state.widgets.text_input, &state.widgets.replace_input)
+                .replace_all(&state.widgets.input_text, &state.widgets.replace_text)
                 .into_owned();
         }
     }
-    ui.text_edit_multiline(&mut state.widgets.replace_output.as_str());
+
+    Frame::canvas(ui.style()).show(ui, |ui| {
+        TextEdit::multiline(&mut state.widgets.result_text.as_str())
+            .desired_width(f32::INFINITY)
+            .show(ui)
+    });
 }
 
 /// Renders connecting lines between corresponding parts of the input text and regular expression text
@@ -211,7 +248,7 @@ fn connecting_lines(
     input_result: &TextEditOutput,
 ) {
     let layout_section_map = match &state.logic {
-        Ok(l) => &l.text_layout.layout_section_map,
+        Ok(l) => &l.input_layout.layout_section_map,
         Err(_) => return,
     };
 
@@ -268,7 +305,7 @@ fn connecting_lines(
         let to = input_result.text_draw_pos + Vec2::new((to_max + to_min) * 0.5, input_y);
 
         // Use cubic bezier lines for a nice looking curve
-        let control_scale = ((to.y - from.y) / 2.0).max(30.0);
+        let control_scale = (to.y - from.y) / 2.0;
         let from_control = from + Vec2::Y * control_scale;
         let to_control = to - Vec2::Y * control_scale;
 
