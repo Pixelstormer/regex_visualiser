@@ -25,6 +25,7 @@ pub fn root(state: &mut AppState, ctx: &Context, frame: &mut eframe::Frame) {
 /// Displays the menu bar (The thing that is usually toggled by pressing `alt`)
 fn menu_bar(ui: &mut Ui, frame: &mut eframe::Frame) {
     egui::menu::bar(ui, |ui| {
+        #[cfg(not(target_arch = "wasm32"))]
         ui.menu_button("File", |ui| {
             if ui.button("Quit").clicked() {
                 frame.quit();
