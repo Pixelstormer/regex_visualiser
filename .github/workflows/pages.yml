@@ -40,7 +40,7 @@ jobs:
         run: wget -qO- https://github.com/thedodd/trunk/releases/latest/download/trunk-x86_64-unknown-linux-gnu.tar.gz | tar -xzf-
       - name: Build
         # The environment variable "${GITHUB_REPOSITORY#*/}" evaluates to the name of the repository
-        # The `--public-url` option controls the base URL for the HTML output, to which all relative paths in the HTML are relative to
+        # The `--public-url` option sets the Base URL for the HTML output, which is what relative URLs are relative to
         # This is necessary when deploying to github pages, where the site is deployed to `username.github.io/repo_name`,
         # such that files must be requested relative to `repo_name`
         # Without setting `--public-url`, files would be requested with incorrect paths, returning 404 not found

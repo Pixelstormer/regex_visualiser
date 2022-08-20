@@ -29,11 +29,12 @@ Regex Visualiser can be compiled to [WASM](https://en.wikipedia.org/wiki/WebAsse
 2. Run `trunk serve` to build the web app and serve it to a local web server.
 3. Open http://127.0.0.1:8080/index.html#dev to view the served application.
 
-The finished web app is found in the `dist/` folder. It consists of three files:
+The finished web app is found in the `dist/` folder.
+Besides the files that are copied verbatim from the `wasm/` and `wasm/icons/` folders, it includes 3 generated files:
 
 * `index.html`: A few lines of HTML, CSS and JS that loads the app.
 * `regex_visualiser_bg.wasm`: What the Rust code compiles to.
-* `regex_visualiser.js`: Auto-generated binding between Rust and JS.
+* `regex_visualiser.js`: Auto-generated bindings between Rust and JS.
 
 You can check out the published app at <https://pixelstormer.github.io/regex_visualiser/>.
 
