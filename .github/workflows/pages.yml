@@ -1,8 +1,7 @@
-# Sample workflow for building and deploying a Jekyll site to GitHub Pages
 name: pages deployment
 
 on:
-  # Runs on pushes targeting the default branch
+  # Runs on pushes targeting the github-pages branch
   push:
     branches: ["github-pages"]
 
@@ -37,20 +36,21 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-pages-
             ${{ runner.os }}-
-      - name: Install Binaryen
-        run: |
-          mkdir binaryen
-          wget -qO- https://github.com/WebAssembly/binaryen/releases/download/version_109/binaryen-version_109-x86_64-linux.tar.gz | tar xvz -C ./binaryen binaryen-version_109 --strip=1
-      - name: Compile
-        run: |
-          export PATH=$PATH:./binaryen/bin
-          ./build_web.sh --optimize
+      - name: Install Trunk
+        run: wget -qO- https://github.com/thedodd/trunk/releases/latest/download/trunk-x86_64-unknown-linux-gnu.tar.gz | tar -xzf-
+      - name: Build
+        # The environment variable "${GITHUB_REPOSITORY#*/}" evaluates to the name of the repository
+        # The `--public-url` option controls the base URL for the HTML output, to which all relative paths in the HTML are relative to
+        # This is necessary when deploying to github pages, where the site is deployed to `username.github.io/repo_name`,
+        # such that files must be requested relative to `repo_name`
+        # Without setting `--public-url`, files would be requested with incorrect paths, returning 404 not found
+        run: ./trunk build --release --public-url "${GITHUB_REPOSITORY#*/}"
       - name: Setup Pages
         uses: actions/configure-pages@v1
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v1
         with:
-          path: ./docs
+          path: ./dist
 
   # Deployment job
   deploy:

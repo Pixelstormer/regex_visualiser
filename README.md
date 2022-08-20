@@ -7,6 +7,8 @@ A program made using [eframe](https://github.com/emilk/egui/tree/master/eframe) 
 
 ## Building
 
+### Native
+
 Make sure you are using the latest version of stable rust by running `rustup update`.
 
 `cargo run --release`
@@ -19,27 +21,15 @@ On Fedora Rawhide you need to run:
 
 `dnf install clang clang-devel clang-tools-extra speech-dispatcher-devel libxkbcommon-devel pkg-config openssl-devel libxcb-devel`
 
-For running the `build_web.sh` script you also need to install `jq` and `binaryen` with your packet manager of choice.
+### Wasm
 
-### Compiling for the web
+Regex Visualiser can be compiled to [WASM](https://en.wikipedia.org/wiki/WebAssembly) and published as a web page. This is done using [Trunk](https://trunkrs.dev/):
 
-Install [jq](https://stedolan.github.io/jq/download/).
+1. Run `cargo install --locked trunk` to install Trunk.
+2. Run `trunk serve` to build the web app and serve it to a local web server.
+3. Open http://127.0.0.1:8080/index.html#dev to view the served application.
 
-Make sure you are using the latest version of stable rust by running `rustup update`.
-
-Regex Visualiser can be compiled to [WASM](https://en.wikipedia.org/wiki/WebAssembly) and published as a web page. For this you need to set up some tools. There are a few simple scripts that help you with this:
-
-```sh
-./setup_web.sh
-./start_server.sh
-./build_web.sh --optimize --open
-```
-
-* `setup_web.sh` installs the tools required to build for web
-* `start_server.sh` starts a local HTTP server so you can test before you publish
-* `build_web.sh` compiles the code to WASM and puts it in the `docs/` folder (see below) and `--open` opens the result in your default browser.
-
-The finished web app is found in the `docs/` folder (this is so that it can easily be published with [GitHub Pages](https://docs.github.com/en/free-pro-team@latest/github/working-with-github-pages/configuring-a-publishing-source-for-your-github-pages-site)). It consists of three files:
+The finished web app is found in the `dist/` folder. It consists of three files:
 
 * `index.html`: A few lines of HTML, CSS and JS that loads the app.
 * `regex_visualiser_bg.wasm`: What the Rust code compiles to.
@@ -47,6 +37,7 @@ The finished web app is found in the `docs/` folder (this is so that it can easi
 
 You can check out the published app at <https://pixelstormer.github.io/regex_visualiser/>.
 
-### Web testing/development
+### Service Worker Caching
 
-Open `index.html#dev` to disable caching, which makes development easier.
+A service worker (See `./wasm/sw.js`) is used to cache the web app so it can be loaded and ran even while offline.
+During development however, this cache could potentially return a stale build, so `./wasm/index.html` contains a snippet of code that allows you to disable this caching by appending `#dev` to the URL (As with the URL given in Step 3 above).

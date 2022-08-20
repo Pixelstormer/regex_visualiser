@@ -1,0 +1,7 @@
+[build]
+target = "wasm/index.html"
+dist = "dist"
+filehash = false
+
+[clean]
+dist = "dist"
