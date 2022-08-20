@@ -22,11 +22,9 @@ impl Application {
         cc.egui_ctx.set_fonts(get_font_definitions());
 
         // Load previous app state (if any).
-        if let Some(storage) = cc.storage {
-            return eframe::get_value(storage, eframe::APP_KEY).unwrap_or_default();
-        }
-
-        Default::default()
+        cc.storage
+            .and_then(|s| eframe::get_value(s, eframe::APP_KEY))
+            .unwrap_or_default()
     }
 }
 
