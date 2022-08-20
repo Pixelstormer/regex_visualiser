@@ -19,29 +19,7 @@ pub struct Application {
 impl Application {
     /// Called once before the first frame.
     pub fn new(cc: &CreationContext<'_>) -> Self {
-        let mut fonts = FontDefinitions::default();
-
-        // Use Atkinson Hyperlegible for legibility
-        fonts.font_data.insert(
-            "Atkinson-Hyperlegible-Regular".to_owned(),
-            FontData::from_static(include_bytes!(
-                "../assets/fonts/Atkinson-Hyperlegible-Regular-102.ttf"
-            )),
-        );
-
-        // Insert it first, for highest priority
-        fonts
-            .families
-            .get_mut(&FontFamily::Proportional)
-            .unwrap()
-            .insert(0, "Atkinson-Hyperlegible-Regular".to_owned());
-
-        // Make all text a bit larger
-        for data in fonts.font_data.values_mut() {
-            data.tweak.scale *= 1.15;
-        }
-
-        cc.egui_ctx.set_fonts(fonts);
+        cc.egui_ctx.set_fonts(get_font_definitions());
 
         // Load previous app state (if any).
         if let Some(storage) = cc.storage {
@@ -62,4 +40,30 @@ impl eframe::App for Application {
     fn update(&mut self, ctx: &Context, frame: &mut Frame) {
         ui::root(&mut self.state, ctx, frame);
     }
+}
+
+pub fn get_font_definitions() -> FontDefinitions {
+    let mut fonts = FontDefinitions::default();
+
+    // Use Atkinson Hyperlegible for legibility
+    fonts.font_data.insert(
+        "Atkinson-Hyperlegible-Regular".to_owned(),
+        FontData::from_static(include_bytes!(
+            "../assets/fonts/Atkinson-Hyperlegible-Regular-102.ttf"
+        )),
+    );
+
+    // Insert it first, for highest priority
+    fonts
+        .families
+        .get_mut(&FontFamily::Proportional)
+        .unwrap()
+        .insert(0, "Atkinson-Hyperlegible-Regular".to_owned());
+
+    // Make all text a bit larger
+    for data in fonts.font_data.values_mut() {
+        data.tweak.scale *= 1.15;
+    }
+
+    fonts
 }
