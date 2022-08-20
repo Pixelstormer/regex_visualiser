@@ -2,10 +2,10 @@
 # This scripts runs various CI-like checks in a convenient way.
 set -eux
 
-cargo check --workspace --all-targets
-cargo check --workspace --all-features --lib --target wasm32-unknown-unknown
+cargo check --workspace --all-features --all-targets
+cargo check --workspace --all-features --all-targets --target wasm32-unknown-unknown
+cargo test --workspace --all-features --all-targets
+cargo test --workspace --all-features --doc
 cargo fmt --all -- --check
-cargo clippy --workspace --all-targets --all-features --  -D warnings -W clippy::all
-cargo test --workspace --all-targets --all-features
-cargo test --workspace --doc
+cargo clippy --workspace --all-features --all-targets -- -D warnings -W clippy::all
 trunk build

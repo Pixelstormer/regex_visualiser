@@ -1,4 +1,4 @@
-name: pages deployment
+name: Deploy to Github Pages
 
 on:
   # Runs on pushes targeting the github-pages branch
@@ -20,40 +20,39 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # Build job
   build:
+    name: Build
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v3
-      - name: Cache
-        uses: actions/cache@v3
+      - name: Restore Cache
+        uses: Swatinem/rust-cache@v2
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
         with:
-          path: |
-            ~/.cargo/
-            target/
-          key: ${{ runner.os }}-cargo-pages-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-pages-
-            ${{ runner.os }}-
+          profile: minimal
+          toolchain: stable
+          target: wasm32-unknown-unknown
+          override: true
       - name: Install Trunk
         run: wget -qO- https://github.com/thedodd/trunk/releases/latest/download/trunk-x86_64-unknown-linux-gnu.tar.gz | tar -xzf-
-      - name: Build
+      - name: Run Trunk
         # The environment variable "${GITHUB_REPOSITORY#*/}" evaluates to the name of the repository
         # The `--public-url` option sets the Base URL for the HTML output, which is what relative URLs are relative to
         # This is necessary when deploying to github pages, where the site is deployed to `username.github.io/repo_name`,
         # such that files must be requested relative to `repo_name`
         # Without setting `--public-url`, files would be requested with incorrect paths, returning 404 not found
         run: ./trunk build --release --public-url "${GITHUB_REPOSITORY#*/}"
-      - name: Setup Pages
+      - name: Configure Pages
         uses: actions/configure-pages@v1
-      - name: Upload artifact
+      - name: Upload Artifact
         uses: actions/upload-pages-artifact@v1
         with:
           path: ./dist
 
-  # Deployment job
   deploy:
+    name: Deploy
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}

@@ -9,163 +9,145 @@ env:
   RUSTFLAGS: --cfg=web_sys_unstable_apis
 
 jobs:
-  check:
-    name: Check
+  cargo_check:
+    name: Cargo Check
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v2
-      - name: Cache
-        uses: actions/cache@v3
-        with:
-          path: |
-            ~/.cargo/
-            target/
-          key: ${{ runner.os }}-cargo-check-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-check-
-            ${{ runner.os }}-
-      - uses: actions-rs/toolchain@v1
+      - name: Restore Cache
+        uses: Swatinem/rust-cache@v2
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
         with:
           profile: minimal
           toolchain: stable
           override: true
-      - uses: actions-rs/cargo@v1
+      - name: Run Cargo
+        uses: actions-rs/cargo@v1
         with:
           command: check
-          args: --all-features
+          args: --all-features --all-targets
 
-  check_wasm:
-    name: Check wasm32
+  cargo_check_wasm:
+    name: Cargo Check Wasm
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v2
-      - name: Cache
-        uses: actions/cache@v3
-        with:
-          path: |
-            ~/.cargo/
-            target/
-          key: ${{ runner.os }}-cargo-wasm-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-wasm-
-            ${{ runner.os }}-
-      - uses: actions-rs/toolchain@v1
+      - name: Restore Cache
+        uses: Swatinem/rust-cache@v2
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
         with:
           profile: minimal
           toolchain: stable
           target: wasm32-unknown-unknown
           override: true
-      - uses: actions-rs/cargo@v1
+      - name: Run Cargo
+        uses: actions-rs/cargo@v1
         with:
           command: check
-          args: --all-features --lib --target wasm32-unknown-unknown
+          args: --all-features --all-targets --target wasm32-unknown-unknown
 
-  test:
-    name: Test Suite
+  cargo_test:
+    name: Cargo Test
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v2
-      - name: Cache
-        uses: actions/cache@v3
-        with:
-          path: |
-            ~/.cargo/
-            target/
-          key: ${{ runner.os }}-cargo-test-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-test-
-            ${{ runner.os }}-
-      - uses: actions-rs/toolchain@v1
+      - name: Restore Cache
+        uses: Swatinem/rust-cache@v2
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
         with:
           profile: minimal
           toolchain: stable
           override: true
-      - run: sudo apt-get install libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libspeechd-dev libxkbcommon-dev libssl-dev
-      - uses: actions-rs/cargo@v1
+      - name: Run Cargo
+        uses: actions-rs/cargo@v1
         with:
           command: test
-          args: --lib
+          args: --all-features --all-targets
 
-  fmt:
-    name: Rustfmt
+  cargo_test_doc:
+    name: Cargo Test Doc
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v2
-      - name: Cache
-        uses: actions/cache@v3
+      - name: Restore Cache
+        uses: Swatinem/rust-cache@v2
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
         with:
-          path: |
-            ~/.cargo/
-            target/
-          key: ${{ runner.os }}-cargo-fmt-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-fmt-
-            ${{ runner.os }}-
-      - uses: actions-rs/toolchain@v1
+          profile: minimal
+          toolchain: stable
+          override: true
+      - name: Run Cargo
+        uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: --all-features --doc
+
+  cargo_fmt:
+    name: Cargo Fmt
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Restore Cache
+        uses: Swatinem/rust-cache@v2
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
         with:
           profile: minimal
           toolchain: stable
           override: true
           components: rustfmt
-      - uses: actions-rs/cargo@v1
+      - name: Run Cargo
+        uses: actions-rs/cargo@v1
         with:
           command: fmt
           args: --all -- --check
 
-  clippy:
-    name: Clippy
+  cargo_clippy:
+    name: Cargo Clippy
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v2
-      - name: Cache
-        uses: actions/cache@v3
-        with:
-          path: |
-            ~/.cargo/
-            target/
-          key: ${{ runner.os }}-cargo-clippy-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-clippy-
-            ${{ runner.os }}-
-      - uses: actions-rs/toolchain@v1
+      - name: Restore Cache
+        uses: Swatinem/rust-cache@v2
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
         with:
           profile: minimal
           toolchain: stable
           override: true
           components: clippy
-      - uses: actions-rs/cargo@v1
+      - name: Run Cargo
+        uses: actions-rs/cargo@v1
         with:
           command: clippy
-          args: -- -D warnings
+          args: --all-features --all-targets -- -D warnings -W clippy::all
 
-  trunk:
-    name: Trunk
+  trunk_build:
+    name: Trunk Build
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v2
-      - name: Cache
-        uses: actions/cache@v3
-        with:
-          path: |
-            ~/.cargo/
-            target/
-          key: ${{ runner.os }}-cargo-bindgen-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-bindgen-
-            ${{ runner.os }}-
-      - uses: actions-rs/toolchain@v1
+      - name: Restore Cache
+        uses: Swatinem/rust-cache@v2
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
         with:
           profile: minimal
-          toolchain: 1.63.0
+          toolchain: stable
           target: wasm32-unknown-unknown
           override: true
       - name: Install Trunk
         run: wget -qO- https://github.com/thedodd/trunk/releases/latest/download/trunk-x86_64-unknown-linux-gnu.tar.gz | tar -xzf-
-      - name: Build
+      - name: Run Trunk
         run: ./trunk build
