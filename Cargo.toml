@@ -8,8 +8,8 @@ edition = "2021"
 rust-version = "1.60"
 
 [dependencies]
-egui = "0.18.0"
-eframe = { version = "0.18.0", features = ["persistence", "dark-light"] }
+egui = "0.19.0"
+eframe = { version = "0.19.0", features = ["persistence", "dark-light"] }
 serde = { version = "1", features = ["derive"] } # You only need serde if you want app persistence
 regex = "1.6.0"
 regex-syntax = "0.6.0"
@@ -31,5 +31,5 @@ tracing-wasm = "0.2"
 # eframe = { git = "https://github.com/emilk/egui", branch = "master" }
 
 # If you fork https://github.com/emilk/egui you can test with:
-# egui = { path = "../egui/egui" }
-# eframe = { path = "../egui/eframe" }
+# egui = { path = "../egui/crates/egui" }
+# eframe = { path = "../egui/crates/eframe" }

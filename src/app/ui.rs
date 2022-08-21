@@ -28,12 +28,15 @@ fn menu_bar(ui: &mut Ui, frame: &mut eframe::Frame) {
         if !frame.is_web() {
             ui.menu_button("File", |ui| {
                 if ui.button("Quit").clicked() {
-                    frame.quit();
+                    frame.close();
                 }
             });
         }
 
-        ui.with_layout(Layout::right_to_left(), egui::warn_if_debug_build);
+        ui.with_layout(
+            Layout::right_to_left(egui::Align::Center),
+            egui::warn_if_debug_build,
+        );
     });
 }
 
