@@ -18,7 +18,7 @@ pub fn root(state: &mut AppState, ctx: &Context, frame: &mut eframe::Frame) {
 
     SidePanel::right("debug_info")
         .max_width(ctx.available_rect().width() * 0.5)
-        .show(ctx, |ui| metadata(ui, state));
+        .show(ctx, |ui| regex_info(ui, state));
 
     CentralPanel::default().show(ctx, |ui| editor(ui, state));
 }
@@ -41,9 +41,9 @@ fn menu_bar(ui: &mut Ui, frame: &mut eframe::Frame) {
     });
 }
 
-/// Displays metadata about the regular expression
-fn metadata(ui: &mut Ui, state: &AppState) {
-    ui.heading("Regex Metadata");
+/// Displays information about the regular expression
+fn regex_info(ui: &mut Ui, state: &AppState) {
+    ui.heading("Regex Information");
     ui.separator();
 
     ScrollArea::vertical().show(ui, |ui| match &state.logic {
