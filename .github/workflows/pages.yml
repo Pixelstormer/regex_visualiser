@@ -45,7 +45,7 @@ jobs:
         # Without setting `--public-url`, files would be requested with incorrect paths, returning 404 not found
         run: ./trunk build --release --public-url "${GITHUB_REPOSITORY#*/}"
       - name: Configure Pages
-        uses: actions/configure-pages@v1
+        uses: actions/configure-pages@v2
       - name: Upload Artifact
         uses: actions/upload-pages-artifact@v1
         with:
