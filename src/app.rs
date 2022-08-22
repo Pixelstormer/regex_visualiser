@@ -1,4 +1,5 @@
 mod colors;
+mod layout;
 mod parsing;
 mod state;
 mod ui;

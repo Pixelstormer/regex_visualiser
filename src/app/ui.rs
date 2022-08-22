@@ -1,4 +1,5 @@
 use super::colors::GetColorExt;
+use super::layout::{get_section_bounds, Bounds};
 use super::parsing::*;
 use super::state::{AppState, LogicState};
 use eframe::epaint::CubicBezierShape;
@@ -233,44 +234,8 @@ fn connecting_lines(
         Err(_) => return,
     };
 
-    // Only handle a single line of text (for now)
-    let regex_row = match regex_result.galley.rows.first() {
-        Some(r) => r,
-        None => return,
-    };
-
-    // The regex text is rendered above the input text so the lines should terminate at the bottom of the regex text
-    let regex_y = regex_row.rect.bottom();
-
-    // Calculate the min and max x coordinates of all of the glyphs in each section
-    let mut regex_bounds: Vec<(f32, f32)> =
-        Vec::with_capacity(regex_result.galley.job.sections.len());
-    for glyph in &regex_row.glyphs {
-        let (min, max) = (glyph.pos.x, glyph.pos.x + glyph.size.x);
-        match regex_bounds.get_mut(glyph.section_index as usize) {
-            Some(bounds) => *bounds = (bounds.0.min(min), bounds.1.max(max)),
-            None => regex_bounds.push((min, max)),
-        }
-    }
-
-    let input_row = match input_result.galley.rows.first() {
-        Some(r) => r,
-        None => return,
-    };
-
-    // The input text is rendered below the regex text so the lines should terminate at the top of the input text
-    let input_y = input_row.rect.top();
-
-    // Calculate the min and max x coordinates of all of the glyphs in each section
-    let mut input_bounds: Vec<(f32, f32)> =
-        Vec::with_capacity(input_result.galley.job.sections.len());
-    for glyph in &input_row.glyphs {
-        let (min, max) = (glyph.pos.x, glyph.pos.x + glyph.size.x);
-        match input_bounds.get_mut(glyph.section_index as usize) {
-            Some(bounds) => *bounds = (bounds.0.min(min), bounds.1.max(max)),
-            None => input_bounds.push((min, max)),
-        }
-    }
+    let regex_bounds = get_section_bounds(&regex_result.galley);
+    let input_bounds = get_section_bounds(&input_result.galley);
 
     // `layout_section_map` determines which sections should have lines drawn between them
     for (regex_section, input_section) in layout_section_map
@@ -278,12 +243,19 @@ fn connecting_lines(
         .enumerate()
         .filter_map(|(i, r)| r.zip(Some(i)))
     {
-        // The x coordinates of each end of the line are the midpoints of the corresponding sections.
-        let (from_min, from_max) = regex_bounds[regex_section];
-        let from = regex_result.text_draw_pos + Vec2::new((from_max + from_min) * 0.5, regex_y);
+        let from = match regex_bounds.get_bounds(regex_section) {
+            Bounds::None => continue,
+            // The regex text is rendered above the input text so the lines should terminate at the bottom of the regex text
+            Bounds::One(r) => r.center_bottom(),
+            Bounds::Some(_) => todo!(),
+        } + regex_result.text_draw_pos.to_vec2();
 
-        let (to_min, to_max) = input_bounds[input_section];
-        let to = input_result.text_draw_pos + Vec2::new((to_max + to_min) * 0.5, input_y);
+        let to = match input_bounds.get_bounds(input_section) {
+            Bounds::None => continue,
+            // The input text is rendered below the regex text so the lines should terminate at the top of the input text
+            Bounds::One(r) => r.center_top(),
+            Bounds::Some(_) => todo!(),
+        } + input_result.text_draw_pos.to_vec2();
 
         // Use cubic bezier lines for a nice looking curve
         let control_scale = (to.y - from.y) / 2.0;
