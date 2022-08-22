@@ -27,9 +27,8 @@ fn main() {
     let web_options = eframe::WebOptions::default();
     eframe::start_web(
         "the_canvas_id", // This id is duplicated in `index.html` as a hardcoded value
-        Box::new(|cc| Box::new(regex_visualiser::Application::new(cc))),
         web_options,
-        Box::new(|cc| Box::new(eframe_template::TemplateApp::new(cc))),
+        Box::new(|cc| Box::new(regex_visualiser::Application::new(cc))),
     )
     .expect("Failed to start eframe");
 }

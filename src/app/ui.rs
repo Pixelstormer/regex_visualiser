@@ -24,15 +24,14 @@ pub fn root(state: &mut AppState, ctx: &Context, frame: &mut eframe::Frame) {
 }
 
 /// Displays the menu bar (The thing that is usually toggled by pressing `alt`)
-fn menu_bar(ui: &mut Ui, frame: &mut eframe::Frame) {
+fn menu_bar(ui: &mut Ui, _frame: &mut eframe::Frame) {
     egui::menu::bar(ui, |ui| {
-        if !frame.is_web() {
-            ui.menu_button("File", |ui| {
-                if ui.button("Quit").clicked() {
-                    frame.close();
-                }
-            });
-        }
+        #[cfg(not(target_arch = "wasm32"))]
+        ui.menu_button("File", |ui| {
+            if ui.button("Quit").clicked() {
+                _frame.close();
+            }
+        });
 
         ui.with_layout(
             Layout::right_to_left(egui::Align::Center),
