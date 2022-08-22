@@ -4,8 +4,8 @@ use super::parsing::*;
 use super::state::{AppState, LogicState};
 use eframe::epaint::CubicBezierShape;
 use egui::{
-    text_edit::TextEditOutput, CentralPanel, Color32, Context, Frame, Layout, Response, RichText,
-    ScrollArea, SidePanel, Stroke, TextEdit, TopBottomPanel, Ui, Vec2,
+    layers::ShapeIdx, text_edit::TextEditOutput, CentralPanel, Color32, Context, Frame, Layout,
+    Response, RichText, ScrollArea, Shape, SidePanel, Stroke, TextEdit, TopBottomPanel, Ui, Vec2,
 };
 
 /// Displays the entire ui
@@ -59,11 +59,12 @@ fn editor(ui: &mut Ui, state: &mut AppState) {
         let regex_result = regex_editor(ui, state);
 
         input_header(ui);
+        let mut idx = None;
         let input_result = ui
             .allocate_ui_with_layout(
                 ui.available_size() - (ui.max_rect().size() * Vec2::Y * 0.5),
                 Layout::centered_and_justified(ui.layout().main_dir()),
-                |ui| input_editor(ui, state),
+                |ui| input_editor(ui, state, &mut idx),
             )
             .inner;
 
@@ -85,7 +86,7 @@ fn editor(ui: &mut Ui, state: &mut AppState) {
             },
         );
 
-        connecting_lines(ui, state, &regex_result, &input_result);
+        connecting_lines(ui, idx.unwrap(), state, &regex_result, &input_result);
     });
 }
 
@@ -140,7 +141,7 @@ fn input_header(ui: &mut Ui) {
 }
 
 /// Handles the input text and associated state
-fn input_editor(ui: &mut Ui, state: &mut AppState) -> TextEditOutput {
+fn input_editor(ui: &mut Ui, state: &mut AppState, idx: &mut Option<ShapeIdx>) -> TextEditOutput {
     // If the text gets edited the layouter will be ran again; keep track of this to enable caching state
     let mut input_changed = false;
     Frame::canvas(ui.style())
@@ -149,6 +150,8 @@ fn input_editor(ui: &mut Ui, state: &mut AppState) -> TextEditOutput {
                 .desired_width(f32::INFINITY)
                 .frame(false)
                 .layouter(&mut |ui, text, wrap_width| {
+                    *idx = Some(ui.painter().add(Shape::Noop));
+
                     if input_changed {
                         if let Ok(logic) = &mut state.logic {
                             // Re-layout the text if it or the regex were changed
@@ -225,10 +228,12 @@ fn result_body(
 /// Renders connecting lines between corresponding parts of the input text and regular expression text
 fn connecting_lines(
     ui: &mut Ui,
+    idx: ShapeIdx,
     state: &AppState,
     regex_result: &TextEditOutput,
     input_result: &TextEditOutput,
 ) {
+    // `layout_section_map` determines which sections should have lines drawn between them
     let layout_section_map = match &state.logic {
         Ok(l) => &l.input_layout.layout_section_map,
         Err(_) => return,
@@ -237,41 +242,47 @@ fn connecting_lines(
     let regex_bounds = get_section_bounds(&regex_result.galley);
     let input_bounds = get_section_bounds(&input_result.galley);
 
-    // `layout_section_map` determines which sections should have lines drawn between them
-    for (regex_section, input_section) in layout_section_map
+    let shapes = layout_section_map
         .iter()
         .enumerate()
-        .filter_map(|(i, r)| r.zip(Some(i)))
-    {
-        let from = match regex_bounds.get_bounds(regex_section) {
-            Bounds::None => continue,
-            // The regex text is rendered above the input text so the lines should terminate at the bottom of the regex text
-            Bounds::One(r) => r.center_bottom(),
-            Bounds::Some(_) => todo!(),
-        } + regex_result.text_draw_pos.to_vec2();
+        .filter_map(|(input_section, r)| {
+            let regex_section = match r {
+                Some(r) => *r,
+                None => return None,
+            };
 
-        let to = match input_bounds.get_bounds(input_section) {
-            Bounds::None => continue,
-            // The input text is rendered below the regex text so the lines should terminate at the top of the input text
-            Bounds::One(r) => r.center_top(),
-            Bounds::Some(_) => todo!(),
-        } + input_result.text_draw_pos.to_vec2();
+            let from = match regex_bounds.get_bounds(regex_section) {
+                Bounds::None => return None,
+                // The regex text is rendered above the input text so the lines should terminate at the bottom of the regex text
+                Bounds::One(r) => r.center_bottom(),
+                Bounds::Some(_) => todo!(),
+            } + regex_result.text_draw_pos.to_vec2();
 
-        // Use cubic bezier lines for a nice looking curve
-        let control_scale = (to.y - from.y) / 2.0;
-        let from_control = from + Vec2::Y * control_scale;
-        let to_control = to - Vec2::Y * control_scale;
+            let to = match input_bounds.get_bounds(input_section) {
+                Bounds::None => return None,
+                // The input text is rendered below the regex text so the lines should terminate at the top of the input text
+                Bounds::One(r) => r.center_top(),
+                Bounds::Some(_) => todo!(),
+            } + input_result.text_draw_pos.to_vec2();
 
-        let bezier = CubicBezierShape::from_points_stroke(
-            [from, from_control, to_control, to],
-            false,
-            Color32::TRANSPARENT,
-            Stroke::new(
-                2.5,
-                regex_result.galley.job.sections[regex_section].get_color(),
-            ),
-        );
+            // Use cubic bezier lines for a nice looking curve
+            let control_scale = (to.y - from.y) / 2.0;
+            let from_control = from + Vec2::Y * control_scale;
+            let to_control = to - Vec2::Y * control_scale;
 
-        ui.painter().add(bezier);
-    }
+            let bezier = CubicBezierShape::from_points_stroke(
+                [from, from_control, to_control, to],
+                false,
+                Color32::TRANSPARENT,
+                Stroke::new(
+                    2.5,
+                    regex_result.galley.job.sections[regex_section].get_color(),
+                ),
+            );
+
+            Some(bezier.into())
+        })
+        .collect::<Vec<_>>();
+
+    ui.painter().set(idx, shapes);
 }
