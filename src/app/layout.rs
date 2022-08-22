@@ -67,6 +67,7 @@ impl LayoutSectionBounds {
     }
 
     /// Mutably get the bounding rectangles of the layout section of the given index
+    #[allow(dead_code)]
     pub fn get_bounds_mut(&mut self, index: usize) -> BoundsMut<'_> {
         match self.get_mut(index) {
             Some(b) => b.into(),
