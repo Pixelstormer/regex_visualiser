@@ -3,7 +3,7 @@
 [![dependency status](https://deps.rs/repo/github/Pixelstormer/regex_visualiser/status.svg)](https://deps.rs/repo/github/Pixelstormer/regex_visualiser)
 [![Build Status](https://github.com/Pixelstormer/regex_visualiser/workflows/CI/badge.svg)](https://github.com/Pixelstormer/regex_visualiser/actions?workflow=CI)
 
-A program made using [eframe](https://github.com/emilk/egui/tree/master/eframe) and [egui](https://github.com/emilk/egui/) to visualise the structure of regular expressions and the way they match text.
+A program made using [eframe](https://github.com/emilk/egui/tree/master/crates/eframe) and [egui](https://github.com/emilk/egui/) to visualise the structure of regular expressions and the way they match text.
 
 ## Building
 
