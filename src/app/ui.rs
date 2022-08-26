@@ -1,8 +1,7 @@
 use super::colors::GetColorExt;
-use super::layout::{get_section_bounds, Bounds};
+use super::layout::{curve_between, galley_section_bounds, Orientation};
 use super::parsing::*;
 use super::state::{AppState, LogicState};
-use eframe::epaint::CubicBezierShape;
 use egui::{
     layers::ShapeIdx, text_edit::TextEditOutput, CentralPanel, Color32, Context, Frame, Layout,
     Response, RichText, ScrollArea, Shape, SidePanel, Stroke, TextEdit, TopBottomPanel, Ui, Vec2,
@@ -238,48 +237,32 @@ fn connecting_lines(
         Err(_) => return,
     };
 
-    let regex_bounds = get_section_bounds(&regex_result.galley);
-    let input_bounds = get_section_bounds(&input_result.galley);
+    let regex_bounds = galley_section_bounds(&regex_result.galley);
+    let input_bounds = galley_section_bounds(&input_result.galley);
+
+    // The rects returned by `galley_section_bounds` are relative to galley position, but painted shapes need absolute coordinates
+    let regex_offset = regex_result.text_draw_pos.to_vec2();
+    let input_offset = input_result.text_draw_pos.to_vec2();
 
     let shapes = layout_section_map
         .iter()
         .enumerate()
-        .filter_map(|(input_section, r)| {
-            let regex_section = match r {
-                Some(r) => *r,
-                None => return None,
-            };
-
-            let from = match regex_bounds.get_bounds(regex_section) {
-                Bounds::None => return None,
-                // The regex text is rendered above the input text so the lines should terminate at the bottom of the regex text
-                Bounds::One(r) => r.center_bottom(),
-                Bounds::Some(_) => todo!(),
-            } + regex_result.text_draw_pos.to_vec2();
-
-            let to = match input_bounds.get_bounds(input_section) {
-                Bounds::None => return None,
-                // The input text is rendered below the regex text so the lines should terminate at the top of the input text
-                Bounds::One(r) => r.center_top(),
-                Bounds::Some(_) => todo!(),
-            } + input_result.text_draw_pos.to_vec2();
-
-            // Use cubic bezier lines for a nice looking curve
-            let control_scale = (to.y - from.y) / 2.0;
-            let from_control = from + Vec2::Y * control_scale;
-            let to_control = to - Vec2::Y * control_scale;
-
-            let bezier = CubicBezierShape::from_points_stroke(
-                [from, from_control, to_control, to],
-                false,
-                Color32::TRANSPARENT,
-                Stroke::new(
-                    2.5,
-                    regex_result.galley.job.sections[regex_section].get_color(),
-                ),
-            );
-
-            Some(bezier.into())
+        .filter_map(|(input_section, &regex_section)| {
+            Some(
+                curve_between(
+                    // The regex text is rendered above the input text so the lines should terminate at the bottom of the regex text
+                    regex_bounds.get(regex_section?)?.center_bottom() + regex_offset,
+                    // The input text is rendered below the regex text so the lines should terminate at the top of the input text
+                    input_bounds.get(input_section)?.center_top() + input_offset,
+                    (
+                        2.5,
+                        // Draw the line with the same color as the sections it's being drawn between
+                        input_result.galley.job.sections[input_section].get_color(),
+                    ),
+                    Orientation::Vertical,
+                )
+                .into(),
+            )
         })
         .collect::<Vec<_>>();
 
