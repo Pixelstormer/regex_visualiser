@@ -1,5 +1,4 @@
-use super::colors::GetColorExt;
-use super::layout::{curve_between, galley_section_bounds, Orientation};
+use super::layout::{curve_between, glyph_bounds, Orientation};
 use super::parsing::*;
 use super::state::{AppState, LogicState};
 use egui::{
@@ -157,7 +156,7 @@ fn input_editor(ui: &mut Ui, state: &mut AppState, idx: &mut Option<ShapeIdx>) -
                                 text.to_owned(),
                                 &logic.regex,
                                 ui.style(),
-                                &logic.regex_layout,
+                                &logic.regex_layout.capture_group_colors,
                             );
                         }
                     }
@@ -231,38 +230,37 @@ fn connecting_lines(
     regex_result: &TextEditOutput,
     input_result: &TextEditOutput,
 ) {
-    // `layout_section_map` determines which sections should have lines drawn between them
-    let layout_section_map = match &state.logic {
-        Ok(l) => &l.input_layout.layout_section_map,
+    let logic = match &state.logic {
+        Ok(logic) => logic,
         Err(_) => return,
     };
-
-    let regex_bounds = galley_section_bounds(&regex_result.galley);
-    let input_bounds = galley_section_bounds(&input_result.galley);
 
     // The rects returned by `galley_section_bounds` are relative to galley position, but painted shapes need absolute coordinates
     let regex_offset = regex_result.text_draw_pos.to_vec2();
     let input_offset = input_result.text_draw_pos.to_vec2();
 
-    let shapes = layout_section_map
+    let shapes = logic
+        .input_layout
+        .capture_group_chars
         .iter()
-        .enumerate()
-        .filter_map(|(input_section, &regex_section)| {
-            Some(
-                curve_between(
-                    // The regex text is rendered above the input text so the lines should terminate at the bottom of the regex text
-                    regex_bounds.get(regex_section?)?.center_bottom() + regex_offset,
-                    // The input text is rendered below the regex text so the lines should terminate at the top of the input text
-                    input_bounds.get(input_section)?.center_top() + input_offset,
-                    (
-                        2.5,
-                        // Draw the line with the same color as the sections it's being drawn between
-                        input_result.galley.job.sections[input_section].get_color(),
-                    ),
-                    Orientation::Vertical,
-                )
-                .into(),
-            )
+        .flat_map(|ranges| {
+            ranges
+                .iter()
+                .zip(&logic.regex_layout.capture_group_chars)
+                .zip(logic.regex_layout.capture_group_colors.iter().skip(1))
+                .filter_map(|((m, (d, r)), &c)| {
+                    Some(
+                        curve_between(
+                            glyph_bounds(&regex_result.galley.rows, r)?.center_bottom()
+                                + regex_offset,
+                            glyph_bounds(&input_result.galley.rows, m.as_ref()?)?.center_top()
+                                + input_offset,
+                            ((*d as f32 + 1.0) * 2.0, c),
+                            Orientation::Vertical,
+                        )
+                        .into(),
+                    )
+                })
         })
         .collect::<Vec<_>>();
 

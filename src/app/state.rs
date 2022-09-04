@@ -72,14 +72,20 @@ impl LogicState {
         previous_state: Option<&Self>,
     ) -> LogicResult {
         compile_regex(pattern).map(|(ast, regex)| {
-            let regex_layout = layout_regex(
+            let regex_layout = regex_parse_ast(
                 regex_text.to_string(),
                 &ast,
                 style,
                 previous_state.map(|s| &s.regex_layout),
             );
-            let input_layout =
-                layout_matched_text(input_text.to_string(), &regex, style, &regex_layout);
+
+            let input_layout = layout_matched_text(
+                input_text.to_string(),
+                &regex,
+                style,
+                &regex_layout.capture_group_colors,
+            );
+
             Self {
                 ast,
                 regex,

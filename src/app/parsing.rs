@@ -1,7 +1,4 @@
-use super::{
-    colors,
-    colors::{FromBackgroundExt, GetColorExt},
-};
+use super::{colors, colors::FromBackgroundExt};
 use egui::{
     text::{LayoutJob, LayoutSection},
     Color32, FontId, FontSelection, Style, TextFormat, TextStyle,
@@ -60,167 +57,144 @@ pub fn compile_regex(pattern: &str) -> Result<(Ast, Regex), RegexError> {
 pub struct RegexLayout {
     /// The layout job describing how to render the regular expression text
     pub job: LayoutJob,
-    /// A mapping from the indexes of capture groups in the regular expression to the indexes of
-    /// layout sections in the layout job that correspond to those groups
-    capture_group_sections: Vec<usize>,
+    /// A mapping from capture groups in the regex to ranges of chars in the regular expression text that
+    /// correspond to those capture groups, as well as the depth of the capture group in the regex ast
+    pub capture_group_chars: Vec<(usize, Range<usize>)>,
+    /// The colors used to highlight each capture group in the regex
+    pub capture_group_colors: Vec<Color32>,
 }
 
-impl RegexLayout {
-    pub fn new(job: LayoutJob, mut capture_group_sections: Vec<usize>) -> Self {
-        // Capture groups are 1-indexed so the element at index 0 is a placeholder that never gets read
-        if !matches!(capture_group_sections.first(), Some(0)) {
-            capture_group_sections.insert(0, 0);
-        }
-
-        Self {
-            job,
-            capture_group_sections,
-        }
-    }
-
-    /// Gets the index of the layout section that corresponds to the capture group of the given index
-    pub fn get_section_index_from_group(&self, capture_group_index: usize) -> Option<usize> {
-        // Index 0 is an implicit capture group that corresponds to the entire match, never a 'real' capture group
-        if capture_group_index == 0 {
-            return None;
-        }
-
-        self.capture_group_sections
-            .get(capture_group_index)
-            .copied()
-    }
-
-    /// Gets the layout section that corresponds to the capture group of the given index
-    pub fn get_section_from_group(&self, capture_group_index: usize) -> Option<&LayoutSection> {
-        let section_index = self.get_section_index_from_group(capture_group_index)?;
-        self.job.sections.get(section_index)
-    }
-}
-
-fn regex_simple_layout(
-    text: String,
-    font_id: FontId,
-    color: Color32,
-    capture_group_sections: Vec<usize>,
-) -> RegexLayout {
-    RegexLayout::new(
-        LayoutJob::single_section(text, TextFormat::background(font_id, color)),
-        capture_group_sections,
-    )
-}
-
-/// Parses the AST of a regular expression and returns information about how it should be rendered
-pub fn layout_regex(
+pub fn regex_parse_ast(
     regex: String,
     ast: &Ast,
     style: &Style,
     previous_layout: Option<&RegexLayout>,
 ) -> RegexLayout {
-    let font_id = FontSelection::from(TextStyle::Monospace).resolve(style);
-    let mut colors_iter = colors::BACKGROUND_COLORS.into_iter().cycle();
-
-    let c = match ast {
-        // If the AST is a concatenation of multiple tokens, those tokens need to be parsed more thoroughly
-        Ast::Concat(c) => c,
-        a => {
-            // If the AST is only a single token, the highlighting is simple
-            let mut sections = vec![0];
-            match a {
-                // If the single token is a capture group, it is equivalent to the whole match
-                Ast::Group(g) if g.capture_index().is_some() => sections.push(0),
-                _ => {}
-            }
-            return regex_simple_layout(regex, font_id, colors_iter.next().unwrap(), sections);
-        }
-    };
-
-    // Capture groups are 1-indexed, so occupy index 0 with a placeholder value that will never be read
-    let mut capture_group_sections = vec![0];
-
-    // There will be at most one section for each token, but usually less because of
-    // chains of consecutive literals being highlighted all together with one section
-    let mut sections = Vec::with_capacity(c.asts.len());
-
-    let mut preceding_color = Color32::TRANSPARENT;
-    let mut literal_start = 0;
-
-    // Iterate over the current and next tokens
-    let mut asts_iter = c.asts.iter().peekable();
-    while let (Some(ast), peeked) = (asts_iter.next(), asts_iter.peek()) {
-        // Get the byte range to be highlighted
-        let byte_range = match (ast, peeked) {
-            // Skip over consecutive literals as only the offsets of the first and last literals in the chain are needed
-            (Ast::Literal(_), Some(Ast::Literal(_))) => continue,
-            // At the end of a chain of literals, get the byte range of the whole chain to be highlighted
-            (Ast::Literal(l), _) => literal_start..l.span.range().end,
-            _ => {
-                if let Some(Ast::Literal(l)) = peeked {
-                    // Take note of the byte offset of the first literal so that the whole chain can be highlighted later
-                    literal_start = l.span.start.offset;
-                }
-
-                ast.span().range()
-            }
-        };
-
-        let mut color = None;
-
-        if let Ast::Group(g) = ast {
-            if let Some(i) = g.capture_index() {
-                let i = i as usize;
-
-                assert_eq!(
-                    capture_group_sections.len(),
-                    i,
-                    "Regex capture group index is not ordinal"
-                );
-
-                // Take note of the section index for this capture group
-                capture_group_sections.push(sections.len());
-
-                // Try and retrieve the previous color for this capture group
-                color = previous_layout
-                    .and_then(|l| l.get_section_from_group(i))
-                    .map(|s| s.get_color());
-            }
-        }
-
-        // Find a color that does not clash with the preceding or following colors
-        if color.is_none() {
-            if let Some(Ast::Group(g)) = peeked {
-                if let Some(i) = g.capture_index() {
-                    if let Some(l) = previous_layout {
-                        if let Some(s) = l.get_section_from_group(i as usize) {
-                            let next_color = s.get_color();
-                            color = colors_iter.find(|&c| c != preceding_color && c != next_color);
-                        }
-                    }
-                }
-            }
-        }
-
-        // If there is no following color, find a color that only avoids clashing with the preceding color
-        let color = color.unwrap_or_else(|| colors_iter.find(|&c| c != preceding_color).unwrap());
-        preceding_color = color;
-
-        // Push a section to highlight the determined byte range; either a single token or multiple consecutive literals
-        sections.push(LayoutSection {
-            leading_space: 0.0,
-            byte_range,
-            format: TextFormat::background(font_id.clone(), color),
-        });
+    if regex.is_empty() {
+        return Default::default();
     }
 
-    sections.shrink_to_fit();
+    // Find the spans of each of the capture groups in the regular expression
+    let ranges = ast_find_capture_groups(ast);
+    let mut sections = Vec::with_capacity(ranges.len());
 
-    RegexLayout::new(
-        LayoutJob {
+    let font_id = FontSelection::from(TextStyle::Monospace).resolve(style);
+
+    let max_depth = ranges.iter().map(|(d, _)| *d).max().unwrap_or_default();
+
+    // Convert the byte ranges into char ranges, to later be used to index into the glyphs of the layed out galley
+    let capture_group_chars = ranges
+        .iter()
+        .cloned()
+        .map(|(d, r)| {
+            (
+                (0..=max_depth).nth_back(d).unwrap(),
+                convert_byte_range_to_char_range(r, &regex).unwrap(),
+            )
+        })
+        .collect();
+
+    // Calculate the color that each capture group will have
+    // Capture groups are 1-indexed, so prepend a placeholder color for the 0th index
+    let capture_group_colors = std::iter::once(Color32::TRANSPARENT)
+        .chain(
+            colors::BACKGROUND_COLORS
+                .into_iter()
+                .cycle()
+                .take(ranges.len()),
+        )
+        .collect::<Vec<_>>();
+
+    // Mark each byte of the regular expression with the index of the capture group it corresponds to
+    let mut section_indexes = vec![0; regex.len()];
+    for (index, (_, range)) in ranges.into_iter().enumerate() {
+        section_indexes[range].fill(index + 1);
+    }
+
+    // Derived from the `Slice::group_by` method;
+    // Find consecutive runs of bytes with equal marked capture groups, and create a layout section for each run
+    let mut head = 0;
+    let mut len = 1;
+    let mut iter = section_indexes.windows(2);
+    while let Some(&[l, r]) = iter.next() {
+        if l != r {
+            sections.push(LayoutSection {
+                leading_space: 0.0,
+                byte_range: head..len,
+                format: TextFormat::background(font_id.clone(), capture_group_colors[l]),
+            });
+
+            head = len;
+        }
+        len += 1;
+    }
+
+    sections.push(LayoutSection {
+        leading_space: 0.0,
+        byte_range: head..len,
+        format: TextFormat::background(font_id, capture_group_colors[section_indexes[head]]),
+    });
+
+    RegexLayout {
+        job: LayoutJob {
             text: regex,
             sections,
             ..Default::default()
         },
-        capture_group_sections,
-    )
+        capture_group_chars,
+        capture_group_colors,
+    }
+}
+
+fn ast_find_capture_groups(ast: &Ast) -> Vec<(usize, Range<usize>)> {
+    let mut vec = Vec::new();
+    ast_find_capture_groups_recurse(0, ast, &mut vec);
+    vec
+}
+
+fn ast_find_capture_groups_recurse(depth: usize, ast: &Ast, vec: &mut Vec<(usize, Range<usize>)>) {
+    match ast {
+        Ast::Repetition(r) => ast_find_capture_groups_recurse(depth + 1, &r.ast, vec),
+        Ast::Group(g) => {
+            if let Some(i) = g.capture_index() {
+                assert_eq!(
+                    vec.len() + 1,
+                    i as usize,
+                    "Regex capture group indexes are not consecutive (Expected: {}, Got: {})",
+                    vec.len() + 1,
+                    i
+                );
+
+                vec.push((depth, g.span.range()));
+                ast_find_capture_groups_recurse(depth + 1, &g.ast, vec);
+            }
+        }
+        Ast::Alternation(a) => {
+            for ast in &a.asts {
+                ast_find_capture_groups_recurse(depth + 1, ast, vec);
+            }
+        }
+        Ast::Concat(c) => {
+            for ast in &c.asts {
+                ast_find_capture_groups_recurse(depth + 1, ast, vec);
+            }
+        }
+        _ => {}
+    }
+}
+
+fn convert_byte_range_to_char_range(range: Range<usize>, text: &str) -> Option<Range<usize>> {
+    let head = text.get(0..range.start)?;
+    let tail = text.get(range)?;
+    let head_offset = str_glyph_count(head);
+    let tail_offset = head_offset + str_glyph_count(tail);
+    Some(head_offset..tail_offset)
+}
+
+/// Counts the number of chars in the given string, excluding newlines (`\n`),
+/// as egui excludes those when laying out text into glyphs
+fn str_glyph_count(s: &str) -> usize {
+    s.chars().count() - s.matches('\n').count()
 }
 
 /// Returns information about how a malformed regular expression string should be rendered
@@ -274,14 +248,15 @@ pub fn layout_regex_err(regex: String, style: &Style, err: &RegexError) -> Regex
         }
     };
 
-    RegexLayout::new(
-        LayoutJob {
+    RegexLayout {
+        job: LayoutJob {
             text: regex,
             sections,
             ..Default::default()
         },
-        vec![0],
-    )
+        capture_group_chars: vec![],
+        capture_group_colors: vec![],
+    }
 }
 
 /// Information about how text that was matched against a regex should be rendered
@@ -289,91 +264,93 @@ pub fn layout_regex_err(regex: String, style: &Style, err: &RegexError) -> Regex
 pub struct MatchedTextLayout {
     /// The layout job describing how to render the matched text
     pub job: LayoutJob,
-    /// A mapping from the indexes of layout sections in the layout job, to the indexes of layout sections in
-    /// the layout job of the regular expression text, that correspond to the part of the regular expression text
-    /// that matched the corresponding part of the input text, if it exists
-    pub layout_section_map: Vec<Option<usize>>,
+    /// A vec of mappings from the indexes of capture groups in the regex to the parts of the text that were
+    /// matched by that capture group, with one mapping for each overall match in the text
+    pub capture_group_chars: Vec<Vec<Option<Range<usize>>>>,
 }
 
-impl MatchedTextLayout {
-    pub fn new(job: LayoutJob, layout_section_map: Vec<Option<usize>>) -> Self {
-        Self {
-            job,
-            layout_section_map,
-        }
-    }
-}
-
-/// Matches a regex against some text and returns information about how the matched text should be rendered
 pub fn layout_matched_text(
     text: String,
     regex: &Regex,
     style: &Style,
-    regex_layout: &RegexLayout,
+    capture_group_colors: &[Color32],
 ) -> MatchedTextLayout {
-    let font_id = FontSelection::from(TextStyle::Monospace).resolve(style);
+    if text.is_empty() {
+        return Default::default();
+    }
 
-    let mut sections = Vec::new();
-    let mut layout_section_map = Vec::new();
-    let mut previous_match_end = 0;
+    if regex.as_str().is_empty() {
+        return MatchedTextLayout {
+            job: layout_plain_text(text, style),
+            capture_group_chars: vec![],
+        };
+    }
 
-    // Iterate over all of the capture groups in all of the matches in the given text
-    for (m, &s) in regex.captures_iter(&text).flat_map(|c| {
-        c.iter()
-            .zip(&regex_layout.capture_group_sections) // Get the regex section indexes for each group
-            .skip(1) // Skip the first group as it is always the entire match
-            .filter_map(|(m, s)| m.filter(|m| !m.range().is_empty()).zip(Some(s))) // Filter out any groups that didn't participate in the match
-            .collect::<Vec<_>>()
-    }) {
-        // Push a section for the text between the previous and current matches,
-        // or on the first iteration, the text between the start of the string and the first match (if any)
-        if previous_match_end < m.start() {
-            layout_section_map.push(None);
-            sections.push(LayoutSection {
-                leading_space: 0.0,
-                byte_range: previous_match_end..m.start(),
-                format: TextFormat {
-                    font_id: font_id.clone(),
-                    ..Default::default()
-                },
-            });
+    let mut capture_group_chars = Vec::new();
+    let mut section_indexes = vec![0; text.len()];
+
+    for captures in regex.captures_iter(&text) {
+        // Get the spans of the matched text from each capture group
+        let ranges = captures
+            .iter()
+            .skip(1) // The first (0th) capture group always corresponds to the entire match, not any 'real' capture groups
+            .map(|m| m.map(|m| m.range()))
+            .collect::<Vec<_>>();
+
+        // Mark each byte of the text with the index of the capture group it corresponds to
+        for (index, range) in ranges
+            .iter()
+            .cloned()
+            .enumerate()
+            .filter_map(|(i, r)| Some(i).zip(r))
+        {
+            section_indexes[range].fill(index + 1);
         }
 
-        // Push a section for this match
-        layout_section_map.push(Some(s));
-        sections.push(LayoutSection {
-            leading_space: 0.0,
-            byte_range: m.range(),
-            format: TextFormat::background(
-                font_id.clone(),
-                regex_layout.job.sections[s].get_color(),
-            ),
-        });
+        // Convert the byte ranges into char ranges, to later be used to index into the glyphs of the layed out galley
+        let char_ranges = ranges
+            .into_iter()
+            .map(|r| r.map(|r| convert_byte_range_to_char_range(r, &text).unwrap()))
+            .collect();
 
-        previous_match_end = m.end();
+        capture_group_chars.push(char_ranges);
     }
 
-    // Push a section for the text between the last match and the end of the string, if any
-    if previous_match_end < text.len() {
-        layout_section_map.push(None);
-        sections.push(LayoutSection {
-            leading_space: 0.0,
-            byte_range: previous_match_end..text.len(),
-            format: TextFormat {
-                font_id,
-                ..Default::default()
-            },
-        });
+    let font_id = FontSelection::from(TextStyle::Monospace).resolve(style);
+    let mut sections = Vec::with_capacity(capture_group_chars.len() * regex.captures_len());
+
+    // Derived from the `Slice::group_by` method;
+    // Find consecutive runs of bytes with equal marked capture groups, and create a layout section for each run
+    let mut head = 0;
+    let mut len = 1;
+    let mut iter = section_indexes.windows(2);
+    while let Some(&[l, r]) = iter.next() {
+        if l != r {
+            sections.push(LayoutSection {
+                leading_space: 0.0,
+                byte_range: head..len,
+                format: TextFormat::background(font_id.clone(), capture_group_colors[l]),
+            });
+
+            head = len;
+        }
+        len += 1;
     }
 
-    MatchedTextLayout::new(
-        LayoutJob {
+    sections.push(LayoutSection {
+        leading_space: 0.0,
+        byte_range: head..len,
+        format: TextFormat::background(font_id, capture_group_colors[section_indexes[head]]),
+    });
+
+    MatchedTextLayout {
+        job: LayoutJob {
             text,
             sections,
             ..Default::default()
         },
-        layout_section_map,
-    )
+        capture_group_chars,
+    }
 }
 
 /// Returns information about how plain text should be rendered
