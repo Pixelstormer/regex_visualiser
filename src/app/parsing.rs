@@ -68,7 +68,7 @@ pub fn regex_parse_ast(
     regex: String,
     ast: &Ast,
     style: &Style,
-    previous_layout: Option<&RegexLayout>,
+    _previous_layout: Option<&RegexLayout>,
 ) -> RegexLayout {
     if regex.is_empty() {
         return Default::default();
