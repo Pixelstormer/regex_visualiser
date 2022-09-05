@@ -23,13 +23,13 @@ impl Application {
 
         // Load previous app state (if any).
         cc.storage
-            .and_then(|s| eframe::get_value(s, eframe::APP_KEY))
+            .and_then(|storage| eframe::get_value(storage, eframe::APP_KEY))
             .unwrap_or_default()
     }
 }
 
 impl eframe::App for Application {
-    /// Called by the frame work to save state before shutdown.
+    /// Called by the framework to save state before shutdown.
     fn save(&mut self, storage: &mut dyn eframe::Storage) {
         eframe::set_value(storage, eframe::APP_KEY, self);
     }
@@ -40,12 +40,13 @@ impl eframe::App for Application {
     }
 }
 
-pub fn get_font_definitions() -> FontDefinitions {
-    let mut fonts = FontDefinitions::default();
-
+fn get_font_definitions() -> FontDefinitions {
     // Use Atkinson Hyperlegible for legibility
+    let font_name = "Atkinson-Hyperlegible-Regular".to_string();
+
+    let mut fonts = FontDefinitions::default();
     fonts.font_data.insert(
-        "Atkinson-Hyperlegible-Regular".to_owned(),
+        font_name.clone(),
         FontData::from_static(include_bytes!(
             "../assets/fonts/Atkinson-Hyperlegible-Regular-102.ttf"
         )),
@@ -56,7 +57,7 @@ pub fn get_font_definitions() -> FontDefinitions {
         .families
         .get_mut(&FontFamily::Proportional)
         .unwrap()
-        .insert(0, "Atkinson-Hyperlegible-Regular".to_owned());
+        .insert(0, font_name);
 
     // Make all text a bit larger
     for data in fonts.font_data.values_mut() {
