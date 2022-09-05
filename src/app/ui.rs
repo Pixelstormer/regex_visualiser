@@ -8,10 +8,6 @@ use egui::{
 
 /// Displays the entire ui
 pub fn root(state: &mut AppState, ctx: &Context, frame: &mut eframe::Frame) {
-    let mut style = (*ctx.style()).clone();
-    style.spacing.item_spacing = Vec2::new(16.0, 6.0);
-    ctx.set_style(style);
-
     TopBottomPanel::top("menu").show(ctx, |ui| menu_bar(ui, frame));
 
     SidePanel::right("debug_info")

@@ -6,7 +6,7 @@ mod ui;
 
 use self::state::AppState;
 use eframe::{CreationContext, Frame};
-use egui::{Context, FontData, FontDefinitions, FontFamily};
+use egui::{Context, FontData, FontDefinitions, FontFamily, Style, Vec2};
 
 /// We derive Deserialize/Serialize so we can persist app state on shutdown.
 #[derive(Default, serde::Deserialize, serde::Serialize)]
@@ -19,7 +19,12 @@ pub struct Application {
 impl Application {
     /// Called once before the first frame.
     pub fn new(cc: &CreationContext<'_>) -> Self {
+        // Update the default fonts and font sizes
         cc.egui_ctx.set_fonts(get_font_definitions());
+
+        // Update the style
+        cc.egui_ctx
+            .set_style(update_style((*cc.egui_ctx.style()).clone()));
 
         // Load previous app state (if any).
         cc.storage
@@ -65,4 +70,9 @@ fn get_font_definitions() -> FontDefinitions {
     }
 
     fonts
+}
+
+fn update_style(mut style: Style) -> Style {
+    style.spacing.item_spacing = Vec2::new(16.0, 6.0);
+    style
 }
