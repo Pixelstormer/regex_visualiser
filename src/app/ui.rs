@@ -20,6 +20,8 @@ pub fn root(state: &mut AppState, ctx: &Context, close_fn: impl FnOnce()) {
 }
 
 /// Displays the menu bar (The thing that is usually toggled by pressing `alt`)
+///
+/// Will call `close_fn` if the application should be closed
 fn menu_bar(ui: &mut Ui, close_fn: impl FnOnce()) {
     egui::menu::bar(ui, |ui| {
         #[cfg(not(target_arch = "wasm32"))]
