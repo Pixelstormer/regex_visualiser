@@ -6,9 +6,11 @@ use egui::{
     Response, RichText, ScrollArea, Shape, SidePanel, Stroke, TextEdit, TopBottomPanel, Ui, Vec2,
 };
 
-/// Displays the entire ui
-pub fn root(state: &mut AppState, ctx: &Context, frame: &mut eframe::Frame) {
-    TopBottomPanel::top("menu").show(ctx, |ui| menu_bar(ui, frame));
+/// Displays and updates the entire ui
+///
+/// Will call `close_fn` if the application should be closed
+pub fn root(state: &mut AppState, ctx: &Context, close_fn: impl FnOnce()) {
+    TopBottomPanel::top("menu").show(ctx, |ui| menu_bar(ui, close_fn));
 
     SidePanel::right("debug_info")
         .max_width(ctx.available_rect().width() * 0.5)
@@ -18,12 +20,12 @@ pub fn root(state: &mut AppState, ctx: &Context, frame: &mut eframe::Frame) {
 }
 
 /// Displays the menu bar (The thing that is usually toggled by pressing `alt`)
-fn menu_bar(ui: &mut Ui, _frame: &mut eframe::Frame) {
+fn menu_bar(ui: &mut Ui, close_fn: impl FnOnce()) {
     egui::menu::bar(ui, |ui| {
         #[cfg(not(target_arch = "wasm32"))]
         ui.menu_button("File", |ui| {
             if ui.button("Quit").clicked() {
-                _frame.close();
+                close_fn();
             }
         });
 
