@@ -29,8 +29,8 @@ jobs:
           command: check
           args: --all-features --all-targets
 
-  cargo_check_wasm:
-    name: Cargo Check Wasm
+  cargo_clippy:
+    name: Cargo Clippy
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -42,13 +42,13 @@ jobs:
         with:
           profile: minimal
           toolchain: stable
-          target: wasm32-unknown-unknown
           override: true
+          components: clippy
       - name: Run Cargo
         uses: actions-rs/cargo@v1
         with:
-          command: check
-          args: --all-features --all-targets --target wasm32-unknown-unknown
+          command: clippy
+          args: --all-features --all-targets -- -D warnings -W clippy::all
 
   cargo_test:
     name: Cargo Test
@@ -111,8 +111,29 @@ jobs:
           command: fmt
           args: --all -- --check
 
-  cargo_clippy:
-    name: Cargo Clippy
+  cargo_check_wasm:
+    name: Cargo Check Wasm
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Restore Cache
+        uses: Swatinem/rust-cache@v2
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          target: wasm32-unknown-unknown
+          override: true
+      - name: Run Cargo
+        uses: actions-rs/cargo@v1
+        with:
+          command: check
+          args: --all-features --all-targets --target wasm32-unknown-unknown
+
+  cargo_clippy_wasm:
+    name: Cargo Clippy Wasm
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -130,7 +151,7 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: clippy
-          args: --all-features --all-targets -- -D warnings -W clippy::all
+          args: --all-features --all-targets --target wasm32-unknown-unknown -- -D warnings -W clippy::all
 
   trunk_build:
     name: Trunk Build
