@@ -13,7 +13,7 @@ pub fn root(state: &mut AppState, ctx: &Context, close_fn: impl FnOnce()) {
     TopBottomPanel::top("menu").show(ctx, |ui| menu_bar(ui, close_fn));
 
     SidePanel::right("debug_info")
-        .max_width(ctx.available_rect().width() * 0.5)
+        .max_width(ctx.available_rect().width() - 64.0)
         .show(ctx, |ui| regex_info(ui, state));
 
     CentralPanel::default().show(ctx, |ui| editor(ui, state));
