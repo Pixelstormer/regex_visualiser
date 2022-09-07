@@ -24,11 +24,18 @@ pub trait FromBackgroundExt {
 impl FromBackgroundExt for TextFormat {
     /// A parallel to the `TextFormat::simple` function, but for specifying the background color instead of the foreground color
     fn background(font_id: FontId, background: Color32) -> Self {
-        Self {
-            font_id,
-            background,
-            color: Color32::WHITE,
-            ..Default::default()
+        if background.a() == 0 {
+            Self {
+                font_id,
+                ..Default::default()
+            }
+        } else {
+            Self {
+                font_id,
+                background,
+                color: Color32::WHITE,
+                ..Default::default()
+            }
         }
     }
 }
