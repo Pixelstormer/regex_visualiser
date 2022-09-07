@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 
-use egui::{text::LayoutSection, Color32, FontId, TextFormat};
+use egui::{Color32, FontId, TextFormat};
 
 pub const FG_BLUE: Color32 = Color32::from_rgb(23, 159, 255);
 pub const FG_YELLOW: Color32 = Color32::from_rgb(255, 215, 0);
@@ -17,21 +17,12 @@ pub const BACKGROUND_COLORS: [Color32; 3] = [BG_BLUE, BG_YELLOW, BG_PINK];
 pub const FG_RED: Color32 = Color32::RED;
 pub const BG_RED: Color32 = Color32::from_rgb(104, 41, 47);
 
-pub trait GetColorExt {
-    fn get_color(&self) -> Color32;
-}
-
-impl GetColorExt for LayoutSection {
-    fn get_color(&self) -> Color32 {
-        self.format.background
-    }
-}
-
 pub trait FromBackgroundExt {
     fn background(font_id: FontId, background: Color32) -> Self;
 }
 
 impl FromBackgroundExt for TextFormat {
+    /// A parallel to the `TextFormat::simple` function, but for specifying the background color instead of the foreground color
     fn background(font_id: FontId, background: Color32) -> Self {
         Self {
             font_id,
