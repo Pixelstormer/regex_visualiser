@@ -269,6 +269,29 @@ fn connecting_lines(
         Err(_) => return,
     };
 
+    let regex_ranges = &logic.regex_layout.capture_group_chars;
+
+    // Each capture group in the regex is highlighted with the color at the corresponding index in `capture_group_colors`,
+    // including the implicit capture group corresponding to the whole match that always occupies index 0
+    // (Which is represented in `capture_group_colors` with `Color32::TRANSPARENT`),
+    // so if `capture_group_colors` has 0 or 1 elements, that means the regex does not contain any real capture groups,
+    // meaning there isn't anything to draw connecting lines between
+    let regex_colors = match logic.regex_layout.capture_group_colors.as_slice() {
+        [_, tail @ ..] if !tail.is_empty() => tail,
+        _ => return,
+    };
+
+    assert_eq!(
+        regex_ranges.len(),
+        regex_colors.len(),
+        "Different number of char ranges and colors for regex capture groups (Ranges: {}, Colors: {})",
+        regex_ranges.len(),
+        regex_colors.len(),
+    );
+
+    let regex_rows = &regex_result.galley.rows;
+    let input_rows = &input_result.galley.rows;
+
     // The rects returned by `galley_section_bounds` are relative to galley position, but painted shapes need absolute coordinates
     let regex_offset = regex_result.text_draw_pos.to_vec2();
     let input_offset = input_result.text_draw_pos.to_vec2();
@@ -278,18 +301,25 @@ fn connecting_lines(
         .capture_group_chars
         .iter()
         .flat_map(|ranges| {
+            assert_eq!(
+                regex_ranges.len(),
+                ranges.len(),
+                "Different number of char ranges for regex and input text (Regex: {}, Input: {})",
+                regex_ranges.len(),
+                ranges.len(),
+            );
+
             ranges
                 .iter()
-                .zip(&logic.regex_layout.capture_group_chars)
-                .zip(logic.regex_layout.capture_group_colors.iter().skip(1))
-                .filter_map(|((m, (d, r)), &c)| {
+                .zip(regex_ranges)
+                .zip(regex_colors)
+                .filter_map(|((input_range, (depth, regex_range)), &color)| {
                     Some(
                         curve_between(
-                            glyph_bounds(&regex_result.galley.rows, r)?.center_bottom()
-                                + regex_offset,
-                            glyph_bounds(&input_result.galley.rows, m.as_ref()?)?.center_top()
+                            glyph_bounds(regex_rows, regex_range)?.center_bottom() + regex_offset,
+                            glyph_bounds(input_rows, input_range.as_ref()?)?.center_top()
                                 + input_offset,
-                            ((*d as f32 + 1.0) * 2.0, c),
+                            ((*depth as f32 + 1.0) * 2.0, color),
                             Orientation::Vertical,
                         )
                         .into(),
