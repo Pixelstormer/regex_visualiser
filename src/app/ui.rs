@@ -6,36 +6,74 @@ use egui::{
     Response, RichText, ScrollArea, Shape, SidePanel, Stroke, TextEdit, TopBottomPanel, Ui, Vec2,
 };
 
-/// Displays and updates the entire ui
-///
-/// Will call `close_fn` if the application should be closed
-pub fn root(state: &mut AppState, ctx: &Context, close_fn: impl FnOnce()) {
-    TopBottomPanel::top("menu").show(ctx, |ui| menu_bar(ui, close_fn));
+#[cfg(not(target_arch = "wasm32"))]
+pub use native::root;
 
-    SidePanel::right("debug_info")
-        .max_width(ctx.available_rect().width() - 64.0)
-        .show(ctx, |ui| regex_info(ui, state));
+#[cfg(target_arch = "wasm32")]
+pub use wasm::root;
 
-    CentralPanel::default().show(ctx, |ui| editor(ui, state));
+#[cfg(not(target_arch = "wasm32"))]
+mod native {
+    use super::*;
+
+    /// Displays and updates the entire ui
+    ///
+    /// Will call `close_fn` if the application should be closed
+    pub fn root(state: &mut AppState, ctx: &Context, close_fn: impl FnOnce()) {
+        TopBottomPanel::top("menu").show(ctx, |ui| menu_bar(ui, close_fn));
+
+        SidePanel::right("debug_info")
+            .max_width(ctx.available_rect().width() - 64.0)
+            .show(ctx, |ui| regex_info(ui, state));
+
+        CentralPanel::default().show(ctx, |ui| editor(ui, state));
+    }
+
+    /// Displays the menu bar (The thing that is usually toggled by pressing `alt`)
+    ///
+    /// Will call `close_fn` if the application should be closed
+    fn menu_bar(ui: &mut Ui, close_fn: impl FnOnce()) {
+        egui::menu::bar(ui, |ui| {
+            ui.menu_button("File", |ui| {
+                if ui.button("Quit").clicked() {
+                    close_fn();
+                }
+            });
+
+            ui.with_layout(
+                Layout::right_to_left(egui::Align::Center),
+                egui::warn_if_debug_build,
+            );
+        });
+    }
 }
 
-/// Displays the menu bar (The thing that is usually toggled by pressing `alt`)
-///
-/// Will call `close_fn` if the application should be closed
-fn menu_bar(ui: &mut Ui, close_fn: impl FnOnce()) {
-    egui::menu::bar(ui, |ui| {
-        #[cfg(not(target_arch = "wasm32"))]
-        ui.menu_button("File", |ui| {
-            if ui.button("Quit").clicked() {
-                close_fn();
-            }
-        });
+#[cfg(target_arch = "wasm32")]
+mod wasm {
+    use super::*;
 
-        ui.with_layout(
-            Layout::right_to_left(egui::Align::Center),
-            egui::warn_if_debug_build,
-        );
-    });
+    /// Displays and updates the entire ui
+    pub fn root(state: &mut AppState, ctx: &Context) {
+        TopBottomPanel::top("menu").show(ctx, |ui| menu_bar(ui));
+
+        SidePanel::right("debug_info")
+            .max_width(ctx.available_rect().width() - 64.0)
+            .show(ctx, |ui| regex_info(ui, state));
+
+        CentralPanel::default().show(ctx, |ui| editor(ui, state));
+    }
+
+    /// Displays a banner at the top of the window
+    fn menu_bar(ui: &mut Ui) {
+        egui::menu::bar(ui, |ui| {
+            ui.heading("Regex Visualiser");
+
+            ui.with_layout(
+                Layout::right_to_left(egui::Align::Center),
+                egui::warn_if_debug_build,
+            );
+        });
+    }
 }
 
 /// Displays information about the regular expression

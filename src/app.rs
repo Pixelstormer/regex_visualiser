@@ -40,11 +40,15 @@ impl eframe::App for Application {
     }
 
     /// Called each time the UI needs repainting, which may be many times per second.
+    #[cfg(not(target_arch = "wasm32"))]
     fn update(&mut self, ctx: &Context, frame: &mut Frame) {
-        ui::root(&mut self.state, ctx, || {
-            #[cfg(not(target_arch = "wasm32"))]
-            frame.close()
-        });
+        ui::root(&mut self.state, ctx, || frame.close());
+    }
+
+    /// Called each time the UI needs repainting, which may be many times per second.
+    #[cfg(target_arch = "wasm32")]
+    fn update(&mut self, ctx: &Context, _: &mut Frame) {
+        ui::root(&mut self.state, ctx);
     }
 }
 
