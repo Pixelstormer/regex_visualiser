@@ -1,4 +1,5 @@
-use super::parsing::*;
+use super::parsing::{compile_regex, RegexError};
+use super::text::{layout_matched_text, regex_parse_ast, MatchedTextLayout, RegexLayout};
 use egui::Style;
 use lazy_static::lazy_static;
 use regex::Regex;

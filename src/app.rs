@@ -1,7 +1,8 @@
-mod colors;
-mod layout;
+mod color;
 mod parsing;
+mod shape;
 mod state;
+mod text;
 mod ui;
 
 use self::state::AppState;

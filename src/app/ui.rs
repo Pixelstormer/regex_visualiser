@@ -1,6 +1,6 @@
-use super::layout::{curve_between, glyph_bounds, Orientation};
-use super::parsing::*;
+use super::shape::{curve_between, Orientation};
 use super::state::{AppState, LogicState};
+use super::text::{glyph_bounds, layout_matched_text, layout_plain_text, layout_regex_err};
 use egui::{
     layers::ShapeIdx, text_edit::TextEditOutput, CentralPanel, Color32, Context, Frame, Layout,
     Response, RichText, ScrollArea, Shape, SidePanel, Stroke, TextEdit, TopBottomPanel, Ui, Vec2,
