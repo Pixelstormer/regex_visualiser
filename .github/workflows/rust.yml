@@ -145,6 +145,7 @@ jobs:
         with:
           profile: minimal
           toolchain: stable
+          target: wasm32-unknown-unknown
           override: true
           components: clippy
       - name: Run Cargo
