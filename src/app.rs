@@ -24,7 +24,7 @@ impl Application {
 
         // Update the style
         cc.egui_ctx
-            .set_style(update_style((*cc.egui_ctx.style()).clone()));
+            .set_style(update_style(cc.egui_ctx.style().as_ref().clone()));
 
         // Load previous app state (if any).
         cc.storage
@@ -39,16 +39,16 @@ impl eframe::App for Application {
         eframe::set_value(storage, eframe::APP_KEY, self);
     }
 
-    /// Called each time the UI needs repainting, which may be many times per second.
+    /// Called each time the UI needs repainting, which may be many times per second. (Native)
     #[cfg(not(target_arch = "wasm32"))]
     fn update(&mut self, ctx: &Context, frame: &mut Frame) {
-        ui::root(&mut self.state, ctx, || frame.close());
+        ui::native::root(&mut self.state, ctx, || frame.close());
     }
 
-    /// Called each time the UI needs repainting, which may be many times per second.
+    /// Called each time the UI needs repainting, which may be many times per second. (Wasm)
     #[cfg(target_arch = "wasm32")]
     fn update(&mut self, ctx: &Context, _: &mut Frame) {
-        ui::root(&mut self.state, ctx);
+        ui::wasm::root(&mut self.state, ctx);
     }
 }
 

@@ -6,23 +6,18 @@ use egui::{
     Response, RichText, ScrollArea, Shape, SidePanel, Stroke, TextEdit, TopBottomPanel, Ui, Vec2,
 };
 
+/// Functions for displaying UI specific to a native build of the app
 #[cfg(not(target_arch = "wasm32"))]
-pub use native::root;
-
-#[cfg(target_arch = "wasm32")]
-pub use wasm::root;
-
-#[cfg(not(target_arch = "wasm32"))]
-mod native {
+pub mod native {
     use super::*;
 
     /// Displays and updates the entire ui
     ///
     /// Will call `close_fn` if the application should be closed
     pub fn root(state: &mut AppState, ctx: &Context, close_fn: impl FnOnce()) {
-        TopBottomPanel::top("menu").show(ctx, |ui| menu_bar(ui, close_fn));
+        TopBottomPanel::top("menu_bar").show(ctx, |ui| menu_bar(ui, close_fn));
 
-        SidePanel::right("debug_info")
+        SidePanel::right("regex_info")
             .max_width(ctx.available_rect().width() - 64.0)
             .show(ctx, |ui| regex_info(ui, state));
 
@@ -48,15 +43,16 @@ mod native {
     }
 }
 
+/// Functions for displaying UI specific to a wasm build of the app
 #[cfg(target_arch = "wasm32")]
-mod wasm {
+pub mod wasm {
     use super::*;
 
     /// Displays and updates the entire ui
     pub fn root(state: &mut AppState, ctx: &Context) {
-        TopBottomPanel::top("menu").show(ctx, |ui| menu_bar(ui));
+        TopBottomPanel::top("banner").show(ctx, |ui| banner(ui));
 
-        SidePanel::right("debug_info")
+        SidePanel::right("regex_info")
             .max_width(ctx.available_rect().width() - 64.0)
             .show(ctx, |ui| regex_info(ui, state));
 
@@ -64,7 +60,7 @@ mod wasm {
     }
 
     /// Displays a banner at the top of the window
-    fn menu_bar(ui: &mut Ui) {
+    fn banner(ui: &mut Ui) {
         egui::menu::bar(ui, |ui| {
             ui.heading("Regex Visualiser");
 
