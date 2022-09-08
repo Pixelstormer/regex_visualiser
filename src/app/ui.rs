@@ -3,7 +3,8 @@ use super::state::{AppState, LogicState};
 use super::text::{glyph_bounds, layout_matched_text, layout_plain_text, layout_regex_err};
 use egui::{
     layers::ShapeIdx, text_edit::TextEditOutput, CentralPanel, Color32, Context, Frame, Layout,
-    Response, RichText, ScrollArea, Shape, SidePanel, Stroke, TextEdit, TopBottomPanel, Ui, Vec2,
+    Response, RichText, ScrollArea, Shape, SidePanel, Stroke, Style, TextEdit, TopBottomPanel, Ui,
+    Vec2, Visuals,
 };
 
 /// Functions for displaying UI specific to a native build of the app
@@ -15,7 +16,7 @@ pub mod native {
     ///
     /// Will call `close_fn` if the application should be closed
     pub fn root(state: &mut AppState, ctx: &Context, close_fn: impl FnOnce()) {
-        TopBottomPanel::top("menu_bar").show(ctx, |ui| menu_bar(ui, close_fn));
+        TopBottomPanel::top("menu_bar").show(ctx, |ui| menu_bar(ui, ctx, close_fn));
 
         SidePanel::right("regex_info")
             .max_width(ctx.available_rect().width() - 64.0)
@@ -27,11 +28,17 @@ pub mod native {
     /// Displays the menu bar (The thing that is usually toggled by pressing `alt`)
     ///
     /// Will call `close_fn` if the application should be closed
-    fn menu_bar(ui: &mut Ui, close_fn: impl FnOnce()) {
+    fn menu_bar(ui: &mut Ui, ctx: &Context, close_fn: impl FnOnce()) {
         egui::menu::bar(ui, |ui| {
             ui.menu_button("File", |ui| {
                 if ui.button("Quit").clicked() {
                     close_fn();
+                }
+            });
+
+            ui.menu_button("View", |ui| {
+                if ui.button("Toggle Theme").clicked() {
+                    ctx.set_style(toggle_theme(ctx.style().as_ref().clone()));
                 }
             });
 
@@ -50,7 +57,7 @@ pub mod wasm {
 
     /// Displays and updates the entire ui
     pub fn root(state: &mut AppState, ctx: &Context) {
-        TopBottomPanel::top("banner").show(ctx, |ui| banner(ui));
+        TopBottomPanel::top("banner").show(ctx, |ui| banner(ui, ctx));
 
         SidePanel::right("regex_info")
             .max_width(ctx.available_rect().width() - 64.0)
@@ -60,16 +67,35 @@ pub mod wasm {
     }
 
     /// Displays a banner at the top of the window
-    fn banner(ui: &mut Ui) {
-        egui::menu::bar(ui, |ui| {
-            ui.heading("Regex Visualiser");
+    fn banner(ui: &mut Ui, ctx: &Context) {
+        Frame::none().inner_margin(8.0).show(ui, |ui| {
+            egui::menu::bar(ui, |ui| {
+                ui.heading("Regex Visualiser");
+                egui::warn_if_debug_build(ui);
 
-            ui.with_layout(
-                Layout::right_to_left(egui::Align::Center),
-                egui::warn_if_debug_build,
-            );
+                ui.with_layout(Layout::right_to_left(egui::Align::Center), |ui| {
+                    let icon = if ctx.style().visuals.dark_mode {
+                        '☀'
+                    } else {
+                        '🌙'
+                    };
+
+                    if ui.button(RichText::new(icon).size(24.0)).clicked() {
+                        ctx.set_style(toggle_theme(ctx.style().as_ref().clone()));
+                    }
+                });
+            });
         });
     }
+}
+
+fn toggle_theme(mut style: Style) -> Style {
+    if style.visuals.dark_mode {
+        style.visuals = Visuals::light();
+    } else {
+        style.visuals = Visuals::dark();
+    }
+    style
 }
 
 /// Displays information about the regular expression
