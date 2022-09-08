@@ -36,7 +36,9 @@ Besides the files that are copied verbatim from the `wasm/` and `wasm/icons/` fo
 * `regex_visualiser_bg.wasm`: What the Rust code compiles to.
 * `regex_visualiser.js`: Auto-generated bindings between Rust and JS.
 
-You can check out the published app at <https://pixelstormer.github.io/regex_visualiser/>.
+### Github Pages
+
+The [Github Actions](https://docs.github.com/en/actions) workflow at `.github/workflows/pages.yml` is used to compile the app to Wasm and deploy it to [Github Pages](https://docs.github.com/en/pages) on demand - You can check out the deployed app at <https://pixelstormer.github.io/regex_visualiser/>.
 
 ### Service Worker Caching
 
