@@ -3,7 +3,21 @@
 [![dependency status](https://deps.rs/repo/github/Pixelstormer/regex_visualiser/status.svg)](https://deps.rs/repo/github/Pixelstormer/regex_visualiser)
 [![Build Status](https://github.com/Pixelstormer/regex_visualiser/workflows/CI/badge.svg)](https://github.com/Pixelstormer/regex_visualiser/actions?workflow=CI)
 
-A program made using [eframe](https://github.com/emilk/egui/tree/master/crates/eframe) and [egui](https://github.com/emilk/egui/) to visualise the structure of regular expressions and the way they match text.
+An application made using [eframe](https://github.com/emilk/egui/tree/master/crates/eframe) and [egui](https://github.com/emilk/egui/) to visualise the structure of regular expressions and the way they match text. Currently in active development, with no guarantees about stability or usability.
+
+## Running
+
+### Github Pages
+
+The [Github Actions](https://docs.github.com/en/actions) workflow at `.github/workflows/pages.yml` is used to compile the app to Wasm and deploy it to [Github Pages](https://docs.github.com/en/pages) on demand - You can check out the deployed app at <https://pixelstormer.github.io/regex_visualiser/>.
+
+### Native
+
+No precompiled binaries are available yet, so if you wish to run the app natively, you must manually download and compile it. Instructions to do this can be found in the **Building** section below.
+
+## License
+
+Regex Visualiser is licensed under the Apache License Version 2.0, as detailed in the `LICENSE` file.
 
 ## Building
 
@@ -35,10 +49,6 @@ Besides the files that are copied verbatim from the `wasm/` and `wasm/icons/` fo
 * `index.html`: A few lines of HTML, CSS and JS that loads the app.
 * `regex_visualiser_bg.wasm`: What the Rust code compiles to.
 * `regex_visualiser.js`: Auto-generated bindings between Rust and JS.
-
-### Github Pages
-
-The [Github Actions](https://docs.github.com/en/actions) workflow at `.github/workflows/pages.yml` is used to compile the app to Wasm and deploy it to [Github Pages](https://docs.github.com/en/pages) on demand - You can check out the deployed app at <https://pixelstormer.github.io/regex_visualiser/>.
 
 ### Service Worker Caching
 
