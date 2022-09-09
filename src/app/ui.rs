@@ -5,9 +5,9 @@ use super::shape::{curve_between, Orientation};
 use super::state::{AppState, LogicState};
 use super::text::{glyph_bounds, layout_matched_text, layout_plain_text, layout_regex_err};
 use egui::{
-    layers::ShapeIdx, text_edit::TextEditOutput, CentralPanel, Color32, Context, Frame, Layout,
-    Response, RichText, ScrollArea, Shape, SidePanel, Stroke, TextEdit, TopBottomPanel, Ui, Vec2,
-    Visuals,
+    layers::ShapeIdx, text_edit::TextEditOutput, Align, CentralPanel, Color32, Context, Frame,
+    Layout, Response, RichText, ScrollArea, Shape, SidePanel, Stroke, TextEdit, TopBottomPanel, Ui,
+    Vec2, Visuals,
 };
 
 /// Functions for displaying UI specific to a native build of the app
@@ -79,7 +79,7 @@ pub mod native {
 
             ui.horizontal(|ui| {
                 ui.spacing_mut().item_spacing.x = 0.0;
-                ui.label("Open source on  ");
+                ui.label("Open source on ");
                 ui.hyperlink_to(
                     format!("{} Github", egui::special_emojis::GITHUB),
                     env!("CARGO_PKG_REPOSITORY"),
@@ -120,9 +120,21 @@ pub mod wasm {
         Frame::none().inner_margin(8.0).show(ui, |ui| {
             egui::menu::bar(ui, |ui| {
                 ui.heading("Regex Visualiser");
+
                 egui::warn_if_debug_build(ui);
 
-                ui.with_layout(Layout::right_to_left(egui::Align::Center), |ui| {
+                ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                    let spacing = std::mem::replace(&mut ui.spacing_mut().item_spacing.x, 5.0);
+                    ui.hyperlink_to(
+                        format!("{} Github", egui::special_emojis::GITHUB),
+                        env!("CARGO_PKG_REPOSITORY"),
+                    );
+                    ui.label(format!(
+                        "Version {} | Open source on",
+                        env!("CARGO_PKG_VERSION")
+                    ));
+                    ui.spacing_mut().item_spacing.x = spacing;
+
                     let icon = if ctx.style().visuals.dark_mode {
                         '☀'
                     } else {
