@@ -1,3 +1,6 @@
+mod syntax_guide;
+
+use self::syntax_guide::syntax_guide;
 use super::shape::{curve_between, Orientation};
 use super::state::{AppState, LogicState};
 use super::text::{glyph_bounds, layout_matched_text, layout_plain_text, layout_regex_err};
@@ -21,6 +24,10 @@ pub mod native {
         SidePanel::right("regex_info")
             .max_width(ctx.available_rect().width() - 64.0)
             .show(ctx, |ui| regex_info(ui, state));
+
+        SidePanel::left("syntax_guide")
+            .max_width(ctx.available_rect().width() - 64.0)
+            .show(ctx, syntax_guide);
 
         CentralPanel::default().show(ctx, |ui| editor(ui, state));
     }
@@ -62,6 +69,10 @@ pub mod wasm {
         SidePanel::right("regex_info")
             .max_width(ctx.available_rect().width() - 64.0)
             .show(ctx, |ui| regex_info(ui, state));
+
+        SidePanel::left("syntax_guide")
+            .max_width(ctx.available_rect().width() - 64.0)
+            .show(ctx, syntax_guide);
 
         CentralPanel::default().show(ctx, |ui| editor(ui, state));
     }
