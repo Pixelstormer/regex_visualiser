@@ -6,8 +6,8 @@ use super::state::{AppState, LogicState};
 use super::text::{glyph_bounds, layout_matched_text, layout_plain_text, layout_regex_err};
 use egui::{
     layers::ShapeIdx, text_edit::TextEditOutput, CentralPanel, Color32, Context, Frame, Layout,
-    Response, RichText, ScrollArea, Shape, SidePanel, Stroke, Style, TextEdit, TopBottomPanel, Ui,
-    Vec2, Visuals,
+    Response, RichText, ScrollArea, Shape, SidePanel, Stroke, TextEdit, TopBottomPanel, Ui, Vec2,
+    Visuals,
 };
 
 /// Functions for displaying UI specific to a native build of the app
@@ -45,7 +45,7 @@ pub mod native {
 
             ui.menu_button("View", |ui| {
                 if ui.button("Toggle Theme").clicked() {
-                    ctx.set_style(toggle_theme(ctx.style().as_ref().clone()));
+                    ctx.set_visuals(toggle_theme(&ctx.style().visuals));
                 }
             });
 
@@ -92,7 +92,7 @@ pub mod wasm {
                     };
 
                     if ui.button(RichText::new(icon).size(24.0)).clicked() {
-                        ctx.set_style(toggle_theme(ctx.style().as_ref().clone()));
+                        ctx.set_visuals(toggle_theme(&ctx.style().visuals));
                     }
                 });
             });
@@ -100,13 +100,12 @@ pub mod wasm {
     }
 }
 
-fn toggle_theme(mut style: Style) -> Style {
-    if style.visuals.dark_mode {
-        style.visuals = Visuals::light();
+fn toggle_theme(visuals: &Visuals) -> Visuals {
+    if visuals.dark_mode {
+        Visuals::light()
     } else {
-        style.visuals = Visuals::dark();
+        Visuals::dark()
     }
-    style
 }
 
 /// Displays information about the regular expression
