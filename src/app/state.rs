@@ -26,6 +26,8 @@ pub struct WidgetState {
     pub input_text: String,
     pub replace_text: String,
     pub result_text: String,
+    #[cfg(not(target_arch = "wasm32"))]
+    pub about_visible: bool,
 }
 
 impl Default for WidgetState {
@@ -35,6 +37,8 @@ impl Default for WidgetState {
             input_text: Default::default(),
             replace_text: "$0".into(),
             result_text: Default::default(),
+            #[cfg(not(target_arch = "wasm32"))]
+            about_visible: Default::default(),
         }
     }
 }

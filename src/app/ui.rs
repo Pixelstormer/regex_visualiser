@@ -19,23 +19,27 @@ pub mod native {
     ///
     /// Will call `close_fn` if the application should be closed
     pub fn root(state: &mut AppState, ctx: &Context, close_fn: impl FnOnce()) {
-        TopBottomPanel::top("menu_bar").show(ctx, |ui| menu_bar(ui, ctx, close_fn));
+        TopBottomPanel::top("menu_bar").show(ctx, |ui| menu_bar(ui, state, ctx, close_fn));
 
-        SidePanel::right("regex_info")
-            .max_width(ctx.available_rect().width() - 64.0)
-            .show(ctx, |ui| regex_info(ui, state));
+        if state.widgets.about_visible {
+            CentralPanel::default().show(ctx, |ui| about(ui, state));
+        } else {
+            SidePanel::right("regex_info")
+                .max_width(ctx.available_rect().width() - 64.0)
+                .show(ctx, |ui| regex_info(ui, state));
 
-        SidePanel::left("syntax_guide")
-            .max_width(ctx.available_rect().width() - 64.0)
-            .show(ctx, syntax_guide);
+            SidePanel::left("syntax_guide")
+                .max_width(ctx.available_rect().width() - 64.0)
+                .show(ctx, syntax_guide);
 
-        CentralPanel::default().show(ctx, |ui| editor(ui, state));
+            CentralPanel::default().show(ctx, |ui| editor(ui, state));
+        }
     }
 
     /// Displays the menu bar (The thing that is usually toggled by pressing `alt`)
     ///
     /// Will call `close_fn` if the application should be closed
-    fn menu_bar(ui: &mut Ui, ctx: &Context, close_fn: impl FnOnce()) {
+    fn menu_bar(ui: &mut Ui, state: &mut AppState, ctx: &Context, close_fn: impl FnOnce()) {
         egui::menu::bar(ui, |ui| {
             ui.menu_button("File", |ui| {
                 if ui.button("Quit").clicked() {
@@ -49,10 +53,44 @@ pub mod native {
                 }
             });
 
+            ui.menu_button("Help", |ui| {
+                ui.toggle_value(&mut state.widgets.about_visible, "About");
+            });
+
             ui.with_layout(
                 Layout::right_to_left(egui::Align::Center),
                 egui::warn_if_debug_build,
             );
+        });
+    }
+
+    /// Displays general information about the application
+    fn about(ui: &mut Ui, state: &mut AppState) {
+        let mut rect = ui.available_rect_before_wrap();
+        let horizontal_shrink = rect.width() / 3.0;
+        let vertical_shrink = rect.height() / 3.0;
+        rect = rect.shrink2(Vec2::new(horizontal_shrink, vertical_shrink));
+
+        ui.allocate_ui_at_rect(rect, |ui| {
+            ui.heading("Regex Visualiser");
+            ui.separator();
+
+            ui.label(format!("Version {}", env!("CARGO_PKG_VERSION")));
+
+            ui.horizontal(|ui| {
+                ui.spacing_mut().item_spacing.x = 0.0;
+                ui.label("Open source on  ");
+                ui.hyperlink_to(
+                    format!("{} Github", egui::special_emojis::GITHUB),
+                    env!("CARGO_PKG_REPOSITORY"),
+                );
+            });
+
+            ui.vertical_centered_justified(|ui| {
+                if ui.button("Close").clicked() {
+                    state.widgets.about_visible = false;
+                }
+            });
         });
     }
 }
