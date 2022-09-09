@@ -37,7 +37,7 @@ pub fn syntax_guide(ui: &mut Ui) {
 }
 
 fn matching_one_character(ui: &mut Ui, monospace: FontId) {
-    CollapsingHeader::new("Matching one character").show(ui, |ui| {
+    CollapsingHeader::new("Matching One Character").show(ui, |ui| {
         Grid::new("matching_one_character")
             .num_columns(2)
             .show(ui, |ui| {
@@ -83,7 +83,7 @@ fn matching_one_character(ui: &mut Ui, monospace: FontId) {
 }
 
 fn character_classes(ui: &mut Ui, monospace: FontId) {
-    CollapsingHeader::new("Character classes").show(ui, |ui| {
+    CollapsingHeader::new("Character Classes").show(ui, |ui| {
         Grid::new("character_classes")
             .num_columns(2)
             .show(ui, |ui| {
@@ -243,7 +243,7 @@ fn repetitions(ui: &mut Ui) {
 }
 
 fn empty_matches(ui: &mut Ui, monospace: FontId) {
-    CollapsingHeader::new("Empty matches").show(ui, |ui| {
+    CollapsingHeader::new("Empty Matches").show(ui, |ui| {
         Grid::new("empty_matches").num_columns(2).show(ui, |ui| {
             ui.monospace("^");
             ui.label(
@@ -285,7 +285,7 @@ fn empty_matches(ui: &mut Ui, monospace: FontId) {
 }
 
 fn grouping_and_flags(ui: &mut Ui, monospace: FontId) {
-    CollapsingHeader::new("Grouping and flags").show(ui, |ui| {
+    CollapsingHeader::new("Grouping And Flags").show(ui, |ui| {
         Grid::new("grouping_and_flags")
             .num_columns(2)
             .show(ui, |ui| {
@@ -389,7 +389,7 @@ fn grouping_and_flags(ui: &mut Ui, monospace: FontId) {
 }
 
 fn escape_sequences(ui: &mut Ui) {
-    CollapsingHeader::new("Escape sequences").show(ui, |ui| {
+    CollapsingHeader::new("Escape Sequences").show(ui, |ui| {
         Grid::new("escape_sequences").num_columns(2).show(ui, |ui| {
             ui.monospace(r"\*");
             ui.label(r"Literal *, works for any punctuation character: \.+*?()|[]{}^$");
@@ -451,7 +451,7 @@ fn escape_sequences(ui: &mut Ui) {
 }
 
 fn perl_character_classes(ui: &mut Ui, monospace: FontId) {
-    CollapsingHeader::new("Perl character classes (Unicode friendly)").show(ui, |ui| {
+    CollapsingHeader::new("Perl Character Classes (Unicode Friendly)").show(ui, |ui| {
         ui.horizontal(|ui| {
             ui.spacing_mut().item_spacing.x = 0.0;
             ui.label("These classes are based on the definitions provided in ");
@@ -512,7 +512,7 @@ fn perl_character_classes(ui: &mut Ui, monospace: FontId) {
 }
 
 fn ascii_character_classes(ui: &mut Ui, monospace: FontId) {
-    CollapsingHeader::new("ASCII character classes").show(ui, |ui| {
+    CollapsingHeader::new("ASCII Character Classes").show(ui, |ui| {
         Grid::new("ascii_character_classes")
             .num_columns(2)
             .show(ui, |ui| {
