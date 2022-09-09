@@ -20,12 +20,31 @@ impl Default for AppState {
     }
 }
 
+#[derive(Default, Eq, PartialEq, Copy, Clone)]
+pub enum TabBarState {
+    #[default]
+    Collapsed,
+    SyntaxGuide,
+    Information,
+}
+
+impl TabBarState {
+    pub fn toggle(&mut self, variant: Self) {
+        if *self == variant {
+            *self = Self::Collapsed;
+        } else {
+            *self = variant;
+        }
+    }
+}
+
 /// State for egui widgets
 pub struct WidgetState {
     pub regex_text: String,
     pub input_text: String,
     pub replace_text: String,
     pub result_text: String,
+    pub tab_bar_state: TabBarState,
     #[cfg(not(target_arch = "wasm32"))]
     pub about_visible: bool,
 }
@@ -37,6 +56,7 @@ impl Default for WidgetState {
             input_text: Default::default(),
             replace_text: "$0".into(),
             result_text: Default::default(),
+            tab_bar_state: Default::default(),
             #[cfg(not(target_arch = "wasm32"))]
             about_visible: Default::default(),
         }

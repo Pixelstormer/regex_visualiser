@@ -2,12 +2,12 @@ mod syntax_guide;
 
 use self::syntax_guide::syntax_guide;
 use super::shape::{curve_between, Orientation};
-use super::state::{AppState, LogicState};
+use super::state::{AppState, LogicState, TabBarState};
 use super::text::{glyph_bounds, layout_matched_text, layout_plain_text, layout_regex_err};
 use egui::{
-    layers::ShapeIdx, text_edit::TextEditOutput, Align, CentralPanel, Color32, Context, Frame,
-    Layout, Response, RichText, ScrollArea, Shape, SidePanel, Stroke, TextEdit, TopBottomPanel, Ui,
-    Vec2, Visuals,
+    layers::ShapeIdx, text_edit::TextEditOutput, CentralPanel, Color32, Context, Frame, Layout,
+    Response, RichText, ScrollArea, Shape, SidePanel, Stroke, TextEdit, TopBottomPanel, Ui, Vec2,
+    Visuals,
 };
 
 /// Functions for displaying UI specific to a native build of the app
@@ -24,13 +24,16 @@ pub mod native {
         if state.widgets.about_visible {
             CentralPanel::default().show(ctx, |ui| about(ui, state));
         } else {
-            SidePanel::right("regex_info")
-                .max_width(ctx.available_rect().width() - 64.0)
-                .show(ctx, |ui| regex_info(ui, state));
+            SidePanel::left("tab_bar")
+                .resizable(false)
+                .min_width(0.0)
+                .show(ctx, |ui| tab_bar(ui, state));
 
-            SidePanel::left("syntax_guide")
-                .max_width(ctx.available_rect().width() - 64.0)
-                .show(ctx, syntax_guide);
+            if state.widgets.tab_bar_state != TabBarState::Collapsed {
+                SidePanel::left("tab_bar_contents")
+                    .max_width(ctx.available_rect().width() - 64.0)
+                    .show(ctx, |ui| tab_bar_contents(ui, state));
+            }
 
             CentralPanel::default().show(ctx, |ui| editor(ui, state));
         }
@@ -54,7 +57,9 @@ pub mod native {
             });
 
             ui.menu_button("Help", |ui| {
-                ui.toggle_value(&mut state.widgets.about_visible, "About");
+                if ui.button("About").clicked() {
+                    state.widgets.about_visible = true;
+                }
             });
 
             ui.with_layout(
@@ -98,19 +103,24 @@ pub mod native {
 /// Functions for displaying UI specific to a wasm build of the app
 #[cfg(target_arch = "wasm32")]
 pub mod wasm {
+    use egui::Align;
+
     use super::*;
 
     /// Displays and updates the entire ui
     pub fn root(state: &mut AppState, ctx: &Context) {
         TopBottomPanel::top("banner").show(ctx, |ui| banner(ui, ctx));
 
-        SidePanel::right("regex_info")
-            .max_width(ctx.available_rect().width() - 64.0)
-            .show(ctx, |ui| regex_info(ui, state));
+        SidePanel::left("tab_bar")
+            .resizable(false)
+            .min_width(0.0)
+            .show(ctx, |ui| tab_bar(ui, state));
 
-        SidePanel::left("syntax_guide")
-            .max_width(ctx.available_rect().width() - 64.0)
-            .show(ctx, syntax_guide);
+        if state.widgets.tab_bar_state != TabBarState::Collapsed {
+            SidePanel::left("tab_bar_contents")
+                .max_width(ctx.available_rect().width() - 64.0)
+                .show(ctx, |ui| tab_bar_contents(ui, state));
+        }
 
         CentralPanel::default().show(ctx, |ui| editor(ui, state));
     }
@@ -150,6 +160,35 @@ pub mod wasm {
     }
 }
 
+fn tab_bar(ui: &mut Ui, state: &mut AppState) {
+    ui.add_space(ui.style().spacing.item_spacing.y);
+
+    if ui
+        .button(RichText::new('ℹ').monospace().size(24.0))
+        .on_hover_text("Regex Information")
+        .clicked()
+    {
+        state.widgets.tab_bar_state.toggle(TabBarState::Information);
+    }
+
+    if ui
+        .button(RichText::new('📖').monospace().size(24.0))
+        .on_hover_text("Syntax Guide")
+        .clicked()
+    {
+        state.widgets.tab_bar_state.toggle(TabBarState::SyntaxGuide);
+    }
+}
+
+fn tab_bar_contents(ui: &mut Ui, state: &AppState) {
+    ui.add_space(ui.style().spacing.item_spacing.y);
+    match state.widgets.tab_bar_state {
+        TabBarState::Collapsed => {}
+        TabBarState::SyntaxGuide => syntax_guide(ui),
+        TabBarState::Information => regex_info(ui, state),
+    }
+}
+
 fn toggle_theme(visuals: &Visuals) -> Visuals {
     if visuals.dark_mode {
         Visuals::light()
@@ -160,8 +199,10 @@ fn toggle_theme(visuals: &Visuals) -> Visuals {
 
 /// Displays information about the regular expression
 fn regex_info(ui: &mut Ui, state: &AppState) {
+    let wrap = std::mem::replace(&mut ui.style_mut().wrap, Some(false));
     ui.heading("Regex Information");
     ui.separator();
+    ui.style_mut().wrap = wrap;
 
     ScrollArea::vertical().show(ui, |ui| match &state.logic {
         Ok(l) => ui.monospace(format!("{:#?}", l.ast)),

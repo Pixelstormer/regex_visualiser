@@ -5,35 +5,33 @@ use egui::{
 
 /// Displays a guide to regular expression syntax
 pub fn syntax_guide(ui: &mut Ui) {
-    CollapsingHeader::new("Syntax Guide")
-        .show_background(true)
-        .show(ui, |ui| {
-            ui.heading("Syntax Guide");
-            ui.separator();
+    let wrap = std::mem::replace(&mut ui.style_mut().wrap, Some(false));
+    ui.heading("Syntax Guide");
+    ui.style_mut().wrap = wrap;
+    ui.separator();
 
-            ScrollArea::vertical().show(ui, |ui| {
-                ui.horizontal(|ui| {
-                    ui.spacing_mut().item_spacing.x = 0.0;
-                    ui.label("Documentation of the supported regular expression syntax (");
-                    ui.hyperlink_to(
-                        "Source",
-                        "https://docs.rs/regex/1.6.0/regex/index.html#syntax",
-                    );
-                    ui.label(")");
-                });
-
-                let monospace = FontSelection::from(TextStyle::Monospace).resolve(ui.style());
-                matching_one_character(ui, monospace.clone());
-                character_classes(ui, monospace.clone());
-                composites(ui);
-                repetitions(ui);
-                empty_matches(ui, monospace.clone());
-                grouping_and_flags(ui, monospace.clone());
-                escape_sequences(ui);
-                perl_character_classes(ui, monospace.clone());
-                ascii_character_classes(ui, monospace);
-            });
+    ScrollArea::vertical().show(ui, |ui| {
+        ui.horizontal(|ui| {
+            ui.spacing_mut().item_spacing.x = 0.0;
+            ui.label("Documentation of the supported regular expression syntax (");
+            ui.hyperlink_to(
+                "Source",
+                "https://docs.rs/regex/1.6.0/regex/index.html#syntax",
+            );
+            ui.label(")");
         });
+
+        let monospace = FontSelection::from(TextStyle::Monospace).resolve(ui.style());
+        matching_one_character(ui, monospace.clone());
+        character_classes(ui, monospace.clone());
+        composites(ui);
+        repetitions(ui);
+        empty_matches(ui, monospace.clone());
+        grouping_and_flags(ui, monospace.clone());
+        escape_sequences(ui);
+        perl_character_classes(ui, monospace.clone());
+        ascii_character_classes(ui, monospace);
+    });
 }
 
 fn matching_one_character(ui: &mut Ui, monospace: FontId) {
