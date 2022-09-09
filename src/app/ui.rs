@@ -129,10 +129,10 @@ pub mod wasm {
                         format!("{} Github", egui::special_emojis::GITHUB),
                         env!("CARGO_PKG_REPOSITORY"),
                     );
-                    ui.label(format!(
-                        "Version {} | Open source on",
-                        env!("CARGO_PKG_VERSION")
-                    ));
+                    ui.label("Open source on");
+                    ui.separator();
+                    ui.label(format!("Version {}", env!("CARGO_PKG_VERSION")));
+                    ui.separator();
                     ui.spacing_mut().item_spacing.x = spacing;
 
                     let icon = if ctx.style().visuals.dark_mode {
@@ -141,7 +141,7 @@ pub mod wasm {
                         '🌙'
                     };
 
-                    if ui.button(RichText::new(icon).size(24.0)).clicked() {
+                    if ui.button(RichText::new(icon).size(20.0)).clicked() {
                         ctx.set_visuals(toggle_theme(&ctx.style().visuals));
                     }
                 });
