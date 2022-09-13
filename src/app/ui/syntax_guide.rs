@@ -7,8 +7,8 @@ use egui::{
 pub fn syntax_guide(ui: &mut Ui) {
     let wrap = std::mem::replace(&mut ui.style_mut().wrap, Some(false));
     ui.heading("Syntax Guide");
-    ui.style_mut().wrap = wrap;
     ui.separator();
+    ui.style_mut().wrap = wrap;
 
     ScrollArea::vertical().show(ui, |ui| {
         ui.horizontal(|ui| {
