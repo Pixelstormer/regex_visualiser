@@ -5,9 +5,9 @@ use super::shape::{curve_between, Orientation};
 use super::state::{AppState, LogicState, TabBarState};
 use super::text::{glyph_bounds, layout_matched_text, layout_plain_text, layout_regex_err};
 use egui::{
-    layers::ShapeIdx, text_edit::TextEditOutput, CentralPanel, Color32, Context, Frame, Layout,
-    Response, RichText, ScrollArea, Shape, SidePanel, Stroke, TextEdit, TopBottomPanel, Ui, Vec2,
-    Visuals,
+    layers::ShapeIdx, text_edit::TextEditOutput, Align, CentralPanel, Color32, Context, Frame,
+    Layout, Response, RichText, ScrollArea, Shape, SidePanel, Stroke, TextEdit, TopBottomPanel, Ui,
+    Vec2, Visuals,
 };
 
 /// Functions for displaying UI specific to a native build of the app
@@ -103,8 +103,6 @@ pub mod native {
 /// Functions for displaying UI specific to a wasm build of the app
 #[cfg(target_arch = "wasm32")]
 pub mod wasm {
-    use egui::Align;
-
     use super::*;
 
     /// Displays and updates the entire ui
@@ -204,9 +202,12 @@ fn regex_info(ui: &mut Ui, state: &AppState) {
     ui.separator();
     ui.style_mut().wrap = wrap;
 
-    ScrollArea::vertical().show(ui, |ui| match &state.logic {
-        Ok(l) => ui.monospace(format!("{:#?}", l.ast)),
-        Err(e) => ui.label(RichText::new(e.to_string()).monospace().color(Color32::RED)),
+    ScrollArea::vertical().show(ui, |ui| {
+        if let Ok(l) = &state.logic {
+            ui.monospace(format!("{:#?}", l.ast))
+        } else {
+            ui.label("The regular expression is malformed. Hover over the red ⊗ to view the error.")
+        }
     });
 }
 
@@ -258,38 +259,54 @@ fn regex_editor(ui: &mut Ui, state: &mut AppState) -> TextEditOutput {
     // If the text gets edited the layouter will be ran again; keep track of this to enable caching state
     let mut regex_changed = false;
 
-    let frame = Frame::canvas(ui.style());
-    state
-        .logic
-        .as_ref()
-        .map_or_else(|_| frame.stroke(Stroke::new(1.0, Color32::RED)), |_| frame)
-        .show(ui, |ui| {
-            TextEdit::singleline(&mut state.widgets.regex_text)
-                .desired_width(f32::INFINITY)
-                .frame(false)
-                .margin(Vec2::new(8.0, 4.0))
-                .layouter(&mut |ui, text, wrap_width| {
-                    if regex_changed {
-                        // Recompute relevant state if the text was edited
-                        state.logic = LogicState::new(
-                            text,
-                            ui.style(),
-                            text,
-                            &state.widgets.input_text,
-                            state.logic.as_ref().ok(),
-                        );
-                    }
-                    regex_changed = true;
+    let mut frame = Frame::canvas(ui.style());
+    if state.logic.is_err() {
+        frame = frame.stroke(Stroke::new(1.0, Color32::RED));
+    }
 
-                    let mut layout_job = state.logic.as_ref().map_or_else(
-                        |e| layout_regex_err(text.into(), ui.style(), e).job,
-                        |l| l.regex_layout.job.clone(),
+    frame
+        .show(ui, |ui| {
+            ui.shrink_height_to_current();
+            ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                ui.add_space(3.0);
+
+                let c = state.logic.is_err().then_some("⊗").unwrap_or_default();
+                let response = ui.label(RichText::new(c).color(Color32::RED).size(21.0));
+                if let Err(e) = &state.logic {
+                    response.on_hover_text(
+                        RichText::new(e.to_string()).color(Color32::RED).monospace(),
                     );
-                    layout_job.wrap.max_width = wrap_width;
-                    ui.fonts().layout_job(layout_job)
-                })
-                .show(ui)
+                }
+
+                let result = TextEdit::singleline(&mut state.widgets.regex_text)
+                    .desired_width(f32::INFINITY)
+                    .frame(false)
+                    .margin(Vec2::new(8.0, 4.0))
+                    .layouter(&mut |ui, text, wrap_width| {
+                        if regex_changed {
+                            // Recompute relevant state if the text was edited
+                            state.logic = LogicState::new(
+                                text,
+                                ui.style(),
+                                text,
+                                &state.widgets.input_text,
+                                state.logic.as_ref().ok(),
+                            );
+                        }
+                        regex_changed = true;
+
+                        let mut layout_job = state.logic.as_ref().map_or_else(
+                            |e| layout_regex_err(text.into(), ui.style(), e).job,
+                            |l| l.regex_layout.job.clone(),
+                        );
+                        layout_job.wrap.max_width = wrap_width;
+                        ui.fonts().layout_job(layout_job)
+                    })
+                    .show(ui);
+                result
+            })
         })
+        .inner
         .inner
 }
 
