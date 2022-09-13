@@ -30,7 +30,8 @@ pub fn syntax_guide(ui: &mut Ui) {
         grouping_and_flags(ui, monospace.clone());
         escape_sequences(ui);
         perl_character_classes(ui, monospace.clone());
-        ascii_character_classes(ui, monospace);
+        ascii_character_classes(ui, monospace.clone());
+        replacement_string_syntax(ui, monospace);
     });
 }
 
@@ -626,6 +627,50 @@ fn ascii_character_classes(ui: &mut Ui, monospace: FontId) {
                 ui.label(job);
                 ui.end_row();
             });
+    });
+}
+
+fn replacement_string_syntax(ui: &mut Ui, monospace: FontId) {
+    CollapsingHeader::new("Replacement String Syntax").show(ui, |ui| {
+        let mut job = LayoutJob::default();
+        job.plaintext("All instances of ");
+        job.with_font("$name", monospace.clone());
+        job.plaintext(" in the replacement text is replaced with the corresponding capture group ");
+        job.with_font("name", monospace.clone());
+        job.plaintext(".");
+        ui.label(job);
+
+        let mut job = LayoutJob::default();
+        job.with_font("name", monospace.clone());
+        job.plaintext(" may be an integer corresponding to the index of the capture group (Counted by order of opening parenthesis where ");
+        job.with_font("0", monospace.clone());
+        job.plaintext(" is the entire match), or it can be a name (Consisting of letters, digits or underscores) corresponding to a named capture group.");
+        ui.label(job);
+
+        let mut job = LayoutJob::default();
+        job.plaintext("If ");
+        job.with_font("name", monospace.clone());
+        job.plaintext(" isn't a valid capture group (Whether the name doesn't exist or isn't a valid index), then it is replaced with the empty string.");
+        ui.label(job);
+
+        let mut job = LayoutJob::default();
+        job.plaintext("The longest possible name is used, e.g. ");
+        job.with_font("$1a", monospace.clone());
+        job.plaintext(" looks up the capture group named ");
+        job.with_font("1a", monospace.clone());
+        job.plaintext(" and not the capture group at index ");
+        job.with_font("1", monospace.clone());
+        job.plaintext(". To exert more precise control over the name, use braces, e.g. ");
+        job.with_font("${1}a", monospace.clone());
+        job.plaintext(".");
+        ui.label(job);
+
+        let mut job = LayoutJob::default();
+        job.plaintext("To write a literal ");
+        job.with_font("$", monospace.clone());
+        job.plaintext(" use ");
+        job.with_font("$$", monospace.clone());
+        job.plaintext(".");
     });
 }
 
