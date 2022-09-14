@@ -43,7 +43,7 @@ pub fn ast_find_capture_groups(ast: &Ast) -> Vec<(usize, Range<usize>)> {
     let mut result = Vec::new();
     while let Some((depth, ast)) = stack.pop() {
         match ast {
-            Ast::Repetition(repetiton) => stack.push((depth + 1, &repetiton.ast)),
+            Ast::Repetition(repetition) => stack.push((depth + 1, &repetition.ast)),
             Ast::Group(group) => {
                 if let Some(index) = group.capture_index() {
                     assert_eq!(
