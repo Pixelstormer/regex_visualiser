@@ -14,10 +14,7 @@ pub fn syntax_guide(ui: &mut Ui) {
         ui.horizontal(|ui| {
             ui.spacing_mut().item_spacing.x = 0.0;
             ui.label("Documentation of the supported regular expression syntax (");
-            ui.hyperlink_to(
-                "Source",
-                "https://docs.rs/regex/1.6.0/regex/index.html#syntax",
-            );
+            ui.hyperlink_to("Source", "https://docs.rs/regex/*/regex/index.html#syntax");
             ui.label(")");
         });
 
