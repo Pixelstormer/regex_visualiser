@@ -39,44 +39,29 @@ pub fn compile_regex(pattern: &str) -> Result<(Ast, Regex), RegexError> {
 }
 
 pub fn ast_find_capture_groups(ast: &Ast) -> Vec<(usize, Range<usize>)> {
-    let mut vec = Vec::new();
-    ast_find_capture_groups_recurse(0, ast, &mut vec);
-    vec
-}
+    let mut stack = vec![(1, ast)];
+    let mut result = Vec::new();
+    while let Some((depth, ast)) = stack.pop() {
+        match ast {
+            Ast::Repetition(repetiton) => stack.push((depth + 1, &repetiton.ast)),
+            Ast::Group(group) => {
+                if let Some(index) = group.capture_index() {
+                    assert_eq!(
+                        result.len() + 1,
+                        index as usize,
+                        "Regex capture group indexes are not consecutive (Expected: {}, Got: {})",
+                        result.len() + 1,
+                        index
+                    );
 
-pub fn ast_find_capture_groups_recurse(
-    depth: usize,
-    ast: &Ast,
-    vec: &mut Vec<(usize, Range<usize>)>,
-) {
-    match ast {
-        Ast::Repetition(repetiton) => {
-            ast_find_capture_groups_recurse(depth + 1, &repetiton.ast, vec)
-        }
-        Ast::Group(group) => {
-            if let Some(index) = group.capture_index() {
-                assert_eq!(
-                    vec.len() + 1,
-                    index as usize,
-                    "Regex capture group indexes are not consecutive (Expected: {}, Got: {})",
-                    vec.len() + 1,
-                    index
-                );
-
-                vec.push((depth, group.span.range()));
-                ast_find_capture_groups_recurse(depth + 1, &group.ast, vec);
+                    result.push((depth, group.span.range()));
+                    stack.push((depth + 1, &group.ast))
+                }
             }
+            Ast::Alternation(alt) => stack.extend(alt.asts.iter().map(|ast| (depth + 1, ast))),
+            Ast::Concat(concat) => stack.extend(concat.asts.iter().map(|ast| (depth + 1, ast))),
+            _ => {}
         }
-        Ast::Alternation(alternation) => {
-            for ast in &alternation.asts {
-                ast_find_capture_groups_recurse(depth + 1, ast, vec);
-            }
-        }
-        Ast::Concat(concat) => {
-            for ast in &concat.asts {
-                ast_find_capture_groups_recurse(depth + 1, ast, vec);
-            }
-        }
-        _ => {}
     }
+    result
 }

@@ -271,7 +271,7 @@ fn connecting_lines(
                             glyph_bounds(regex_rows, regex_range)?.center_bottom() + regex_offset,
                             glyph_bounds(input_rows, input_range.as_ref()?)?.center_top()
                                 + input_offset,
-                            ((*depth as f32 + 1.0) * 2.0, color),
+                            ((*depth as f32) * 2.0, color),
                             Orientation::Vertical,
                         )
                         .into(),
