@@ -11,7 +11,7 @@ fn main() {
     eframe::run_native(
         "Regex Visualiser",
         native_options,
-        Box::new(|cc| Box::new(regex_visualiser::Application::new(cc))),
+        Box::new(|creation_context| Box::new(regex_visualiser::Application::new(creation_context))),
     );
 }
 
@@ -28,7 +28,7 @@ fn main() {
     eframe::start_web(
         "the_canvas_id", // This id is duplicated in `index.html` as a hardcoded value
         web_options,
-        Box::new(|cc| Box::new(regex_visualiser::Application::new(cc))),
+        Box::new(|creation_context| Box::new(regex_visualiser::Application::new(creation_context))),
     )
     .expect("Failed to start eframe");
 }

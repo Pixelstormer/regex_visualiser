@@ -32,8 +32,8 @@ fn convert_byte_range_to_char_range(range: Range<usize>, text: &str) -> Option<R
 
 /// Counts the number of chars in the given string, excluding newlines (`\n`),
 /// as egui excludes those when laying out text into glyphs
-fn str_glyph_count(s: &str) -> usize {
-    s.chars().count() - s.matches('\n').count()
+fn str_glyph_count(text: &str) -> usize {
+    text.chars().count() - text.matches('\n').count()
 }
 
 /// Information about how a regular expression should be rendered
@@ -64,16 +64,20 @@ pub fn regex_parse_ast(
 
     let font_id = FontSelection::from(TextStyle::Monospace).resolve(style);
 
-    let max_depth = ranges.iter().map(|(d, _)| *d).max().unwrap_or_default();
+    let max_depth = ranges
+        .iter()
+        .map(|(depth, _)| *depth)
+        .max()
+        .unwrap_or_default();
 
     // Convert the byte ranges into char ranges, to later be used to index into the glyphs of the layed out galley
     let capture_group_chars = ranges
         .iter()
         .cloned()
-        .map(|(d, r)| {
+        .map(|(depth, range)| {
             (
-                (0..=max_depth).nth_back(d).unwrap(),
-                convert_byte_range_to_char_range(r, &regex).unwrap(),
+                (0..=max_depth).nth_back(depth).unwrap(),
+                convert_byte_range_to_char_range(range, &regex).unwrap(),
             )
         })
         .collect();
@@ -100,12 +104,12 @@ pub fn regex_parse_ast(
     let mut head = 0;
     let mut len = 1;
     let mut iter = section_indexes.windows(2);
-    while let Some(&[l, r]) = iter.next() {
-        if l != r {
+    while let Some(&[left, right]) = iter.next() {
+        if left != right {
             sections.push(LayoutSection {
                 leading_space: 0.0,
                 byte_range: head..len,
-                format: TextFormat::background(font_id.clone(), capture_group_colors[l]),
+                format: TextFormat::background(font_id.clone(), capture_group_colors[left]),
             });
 
             head = len;
@@ -162,14 +166,14 @@ pub fn layout_regex_err(regex: String, style: &Style, err: &RegexError) -> Regex
 
     let sections = match (span, aux) {
         (None, _) => vec![highlight(0..regex.len(), font_id)],
-        (Some(e), None) => vec![
-            plaintext(0..e.start.offset, font_id.clone()),
-            highlight(e.range(), font_id.clone()),
-            plaintext(e.end.offset..regex.len(), font_id),
+        (Some(span), None) => vec![
+            plaintext(0..span.start.offset, font_id.clone()),
+            highlight(span.range(), font_id.clone()),
+            plaintext(span.end.offset..regex.len(), font_id),
         ],
-        (Some(e), Some(a)) => {
-            let min = e.min(a);
-            let max = e.max(a);
+        (Some(span), Some(aux)) => {
+            let min = span.min(aux);
+            let max = span.max(aux);
 
             vec![
                 plaintext(0..min.start.offset, font_id.clone()),
@@ -227,7 +231,7 @@ pub fn layout_matched_text(
         let ranges = captures
             .iter()
             .skip(1) // The first (0th) capture group always corresponds to the entire match, not any 'real' capture groups
-            .map(|m| m.map(|m| m.range()))
+            .map(|r#match| r#match.map(|r#match| r#match.range()))
             .collect::<Vec<_>>();
 
         // Mark each byte of the text with the index of the capture group it corresponds to
@@ -235,7 +239,7 @@ pub fn layout_matched_text(
             .iter()
             .cloned()
             .enumerate()
-            .filter_map(|(i, r)| Some(i).zip(r))
+            .filter_map(|(index, range)| Some(index).zip(range))
         {
             section_indexes[range].fill(index + 1);
         }
@@ -243,7 +247,7 @@ pub fn layout_matched_text(
         // Convert the byte ranges into char ranges, to later be used to index into the glyphs of the layed out galley
         let char_ranges = ranges
             .into_iter()
-            .map(|r| r.map(|r| convert_byte_range_to_char_range(r, &text).unwrap()))
+            .map(|range| range.map(|range| convert_byte_range_to_char_range(range, &text).unwrap()))
             .collect();
 
         capture_group_chars.push(char_ranges);
@@ -257,12 +261,12 @@ pub fn layout_matched_text(
     let mut head = 0;
     let mut len = 1;
     let mut iter = section_indexes.windows(2);
-    while let Some(&[l, r]) = iter.next() {
-        if l != r {
+    while let Some(&[left, right]) = iter.next() {
+        if left != right {
             sections.push(LayoutSection {
                 leading_space: 0.0,
                 byte_range: head..len,
-                format: TextFormat::background(font_id.clone(), capture_group_colors[l]),
+                format: TextFormat::background(font_id.clone(), capture_group_colors[left]),
             });
 
             head = len;
@@ -316,7 +320,7 @@ pub fn glyph_bounds(rows: &[Row], range: &Range<usize>) -> Option<Rect> {
         // If `try_fold` returns `ControlFlow::Continue` that means the entire iterator was exhausted,
         // or in other words the range is out of the bounds of all of the rows
         ControlFlow::Continue(_) => return None,
-        ControlFlow::Break(r) => r,
+        ControlFlow::Break(result) => result,
     };
 
     let mut tail_start = range.start;
@@ -342,12 +346,10 @@ pub fn glyph_bounds(rows: &[Row], range: &Range<usize>) -> Option<Rect> {
             // Update the offset for the next row
             offset = row_end;
 
-            Some(
-                row.glyphs[head]
-                    .iter()
-                    .fold(Rect::NOTHING, |a, g| a.union(g.logical_rect())),
-            )
+            Some(row.glyphs[head].iter().fold(Rect::NOTHING, |rect, glyph| {
+                rect.union(glyph.logical_rect())
+            }))
         })
         // Choose the widest rect out of those that this range produced
-        .max_by(|a, b| a.width().partial_cmp(&b.width()).unwrap())
+        .max_by(|x, y| x.width().partial_cmp(&y.width()).unwrap())
 }

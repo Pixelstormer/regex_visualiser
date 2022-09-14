@@ -101,7 +101,7 @@ impl LogicState {
                 regex_text.to_string(),
                 &ast,
                 style,
-                previous_state.map(|s| &s.regex_layout),
+                previous_state.map(|state| &state.regex_layout),
             );
 
             let input_layout = layout_matched_text(

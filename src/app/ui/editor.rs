@@ -18,12 +18,12 @@ pub fn editor_ui(ui: &mut Ui, state: &mut AppState) {
         let regex_result = regex_editor(ui, state);
 
         input_header(ui);
-        let mut idx = None;
+        let mut connecting_lines_idx = None;
         let input_result = ui
             .allocate_ui_with_layout(
                 ui.available_size() - (ui.max_rect().size() * Vec2::Y * 0.5),
                 Layout::centered_and_justified(ui.layout().main_dir()),
-                |ui| input_editor(ui, state, &mut idx),
+                |ui| input_editor(ui, state, &mut connecting_lines_idx),
             )
             .inner;
 
@@ -45,7 +45,13 @@ pub fn editor_ui(ui: &mut Ui, state: &mut AppState) {
             },
         );
 
-        connecting_lines(ui, state, idx.unwrap(), &regex_result, &input_result);
+        connecting_lines(
+            ui,
+            state,
+            connecting_lines_idx.unwrap(),
+            &regex_result,
+            &input_result,
+        );
     });
 }
 
@@ -70,11 +76,13 @@ fn regex_editor(ui: &mut Ui, state: &mut AppState) -> TextEditOutput {
             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                 ui.add_space(3.0);
 
-                let c = state.logic.is_err().then_some("⊗").unwrap_or_default();
-                let response = ui.label(RichText::new(c).color(Color32::RED).size(21.0));
-                if let Err(e) = &state.logic {
+                let icon = state.logic.is_err().then_some("⊗").unwrap_or_default();
+                let response = ui.label(RichText::new(icon).color(Color32::RED).size(21.0));
+                if let Err(err) = &state.logic {
                     response.on_hover_text(
-                        RichText::new(e.to_string()).color(Color32::RED).monospace(),
+                        RichText::new(err.to_string())
+                            .color(Color32::RED)
+                            .monospace(),
                     );
                 }
 
@@ -96,8 +104,8 @@ fn regex_editor(ui: &mut Ui, state: &mut AppState) -> TextEditOutput {
                         regex_changed = true;
 
                         let mut layout_job = state.logic.as_ref().map_or_else(
-                            |e| layout_regex_err(text.into(), ui.style(), e).job,
-                            |l| l.regex_layout.job.clone(),
+                            |err| layout_regex_err(text.into(), ui.style(), err).job,
+                            |state| state.regex_layout.job.clone(),
                         );
                         layout_job.wrap.max_width = wrap_width;
                         ui.fonts().layout_job(layout_job)
@@ -142,7 +150,7 @@ fn input_editor(ui: &mut Ui, state: &mut AppState, idx: &mut Option<ShapeIdx>) -
 
                     let mut layout_job = state.logic.as_ref().map_or_else(
                         |_| layout_plain_text(text.to_owned(), ui.style()),
-                        |l| l.input_layout.job.clone(),
+                        |state| state.input_layout.job.clone(),
                     );
                     layout_job.wrap.max_width = wrap_width;
                     ui.fonts().layout_job(layout_job)

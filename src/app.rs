@@ -9,7 +9,7 @@ use self::{
     state::AppState,
     ui::{create_font_definitions, update_style},
 };
-use eframe::{CreationContext, Frame};
+use eframe::{App, CreationContext, Frame, Storage};
 use egui::Context;
 use serde::{Deserialize, Serialize};
 
@@ -38,9 +38,9 @@ impl Application {
     }
 }
 
-impl eframe::App for Application {
+impl App for Application {
     /// Called by the framework to save state before shutdown.
-    fn save(&mut self, storage: &mut dyn eframe::Storage) {
+    fn save(&mut self, storage: &mut dyn Storage) {
         eframe::set_value(storage, eframe::APP_KEY, self);
     }
 
