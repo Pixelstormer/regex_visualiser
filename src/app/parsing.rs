@@ -38,23 +38,26 @@ pub fn compile_regex(pattern: &str) -> Result<(Ast, Regex), RegexError> {
     Ok((Parser::new().parse(pattern)?, Regex::new(pattern)?))
 }
 
-pub fn ast_find_capture_groups(ast: &Ast) -> Vec<(usize, Range<usize>)> {
-    let mut stack = vec![(1, ast)];
-    let mut result = Vec::new();
+/// Finds all capture groups in the given AST and returns the depth and span of each one
+pub fn ast_find_capture_groups(ast: &Ast) -> (Vec<usize>, Vec<Range<usize>>) {
+    let mut stack = vec![(0, ast)];
+    let mut depths = Vec::new();
+    let mut ranges = Vec::new();
     while let Some((depth, ast)) = stack.pop() {
         match ast {
             Ast::Repetition(repetition) => stack.push((depth + 1, &repetition.ast)),
             Ast::Group(group) => {
                 if let Some(index) = group.capture_index() {
                     assert_eq!(
-                        result.len() + 1,
+                        depths.len() + 1,
                         index as usize,
                         "Regex capture group indexes are not consecutive (Expected: {}, Got: {})",
-                        result.len() + 1,
+                        depths.len() + 1,
                         index
                     );
 
-                    result.push((depth, group.span.range()));
+                    depths.push(depth);
+                    ranges.push(group.span.range());
                     stack.push((depth + 1, &group.ast))
                 }
             }
@@ -63,5 +66,5 @@ pub fn ast_find_capture_groups(ast: &Ast) -> Vec<(usize, Range<usize>)> {
             _ => {}
         }
     }
-    result
+    (depths, ranges)
 }

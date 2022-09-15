@@ -59,28 +59,9 @@ pub fn regex_parse_ast(
     }
 
     // Find the spans of each of the capture groups in the regular expression
-    let ranges = ast_find_capture_groups(ast);
-    let mut sections = Vec::with_capacity(ranges.len());
+    let (depths, ranges) = ast_find_capture_groups(ast);
 
     let font_id = FontSelection::from(TextStyle::Monospace).resolve(style);
-
-    let max_depth = ranges
-        .iter()
-        .map(|(depth, _)| *depth)
-        .max()
-        .unwrap_or_default();
-
-    // Convert the byte ranges into char ranges, to later be used to index into the glyphs of the layed out galley
-    let capture_group_chars = ranges
-        .iter()
-        .cloned()
-        .map(|(depth, range)| {
-            (
-                (0..=max_depth).nth_back(depth).unwrap(),
-                convert_byte_range_to_char_range(range, &regex).unwrap(),
-            )
-        })
-        .collect();
 
     // Calculate the color that each capture group will have
     // Capture groups are 1-indexed, so prepend a placeholder color for the 0th index
@@ -93,35 +74,28 @@ pub fn regex_parse_ast(
         )
         .collect::<Vec<_>>();
 
-    // Mark each byte of the regular expression with the index of the capture group it corresponds to
-    let mut section_indexes = vec![0; regex.len()];
-    for (index, (_, range)) in ranges.into_iter().enumerate() {
-        section_indexes[range].fill(index + 1);
-    }
+    let sections = build_layout_sections(
+        &mut vec![0; regex.len()],
+        ranges.iter().cloned().enumerate(),
+        font_id,
+        &capture_group_colors,
+    );
 
-    // Derived from the `Slice::group_by` method;
-    // Find consecutive runs of bytes with equal marked capture groups, and create a layout section for each run
-    let mut head = 0;
-    let mut len = 1;
-    let mut iter = section_indexes.windows(2);
-    while let Some(&[left, right]) = iter.next() {
-        if left != right {
-            sections.push(LayoutSection {
-                leading_space: 0.0,
-                byte_range: head..len,
-                format: TextFormat::background(font_id.clone(), capture_group_colors[left]),
-            });
+    let max_depth = *depths.iter().max().unwrap_or(&0);
 
-            head = len;
-        }
-        len += 1;
-    }
-
-    sections.push(LayoutSection {
-        leading_space: 0.0,
-        byte_range: head..len,
-        format: TextFormat::background(font_id, capture_group_colors[section_indexes[head]]),
-    });
+    // Convert the byte ranges into char ranges, to later be used to index into the glyphs of the layed out galley
+    let capture_group_chars = depths
+        .into_iter()
+        .zip(ranges)
+        .map(|(depth, range)| {
+            (
+                // Invert the depth value, as it will eventually be used as the thickness of the connecting line,
+                // so shallower lines should be thicker than deeper lines that may be rendered ontop of them
+                (0..=max_depth).nth_back(depth).unwrap(),
+                convert_byte_range_to_char_range(range, &regex).unwrap(),
+            )
+        })
+        .collect();
 
     RegexLayout {
         job: LayoutJob {
@@ -224,61 +198,40 @@ pub fn layout_matched_text(
     }
 
     let mut capture_group_chars = Vec::new();
-    let mut section_indexes = vec![0; text.len()];
+    let mut ranges = Vec::new();
 
     for captures in regex.captures_iter(&text) {
-        // Get the spans of the matched text from each capture group
-        let ranges = captures
+        // Convert the byte ranges into char ranges, to later be used to index into the glyphs of the layed out galley
+        let char_ranges = captures
             .iter()
             .skip(1) // The first (0th) capture group always corresponds to the entire match, not any 'real' capture groups
-            .map(|r#match| r#match.map(|r#match| r#match.range()))
-            .collect::<Vec<_>>();
-
-        // Mark each byte of the text with the index of the capture group it corresponds to
-        for (index, range) in ranges
-            .iter()
-            .cloned()
-            .enumerate()
-            .filter_map(|(index, range)| Some(index).zip(range))
-        {
-            section_indexes[range].fill(index + 1);
-        }
-
-        // Convert the byte ranges into char ranges, to later be used to index into the glyphs of the layed out galley
-        let char_ranges = ranges
-            .into_iter()
-            .map(|range| range.map(|range| convert_byte_range_to_char_range(range, &text).unwrap()))
+            .map(|r#match| {
+                r#match.map(|r#match| {
+                    convert_byte_range_to_char_range(r#match.range(), &text).unwrap()
+                })
+            })
             .collect();
 
         capture_group_chars.push(char_ranges);
+
+        // Get the spans of the matched text from each capture group
+        let iter = captures
+            .iter()
+            .skip(1) // The first (0th) capture group always corresponds to the entire match, not any 'real' capture groups
+            .enumerate()
+            .filter_map(|(index, r#match)| r#match.map(|r#match| (index, r#match.range())));
+
+        ranges.extend(iter);
     }
 
     let font_id = FontSelection::from(TextStyle::Monospace).resolve(style);
-    let mut sections = Vec::with_capacity(capture_group_chars.len() * regex.captures_len());
 
-    // Derived from the `Slice::group_by` method;
-    // Find consecutive runs of bytes with equal marked capture groups, and create a layout section for each run
-    let mut head = 0;
-    let mut len = 1;
-    let mut iter = section_indexes.windows(2);
-    while let Some(&[left, right]) = iter.next() {
-        if left != right {
-            sections.push(LayoutSection {
-                leading_space: 0.0,
-                byte_range: head..len,
-                format: TextFormat::background(font_id.clone(), capture_group_colors[left]),
-            });
-
-            head = len;
-        }
-        len += 1;
-    }
-
-    sections.push(LayoutSection {
-        leading_space: 0.0,
-        byte_range: head..len,
-        format: TextFormat::background(font_id, capture_group_colors[section_indexes[head]]),
-    });
+    let sections = build_layout_sections(
+        &mut vec![0; text.len()],
+        ranges.into_iter(),
+        font_id,
+        capture_group_colors,
+    );
 
     MatchedTextLayout {
         job: LayoutJob {
@@ -352,4 +305,50 @@ pub fn glyph_bounds(rows: &[Row], range: &Range<usize>) -> Option<Rect> {
         })
         // Choose the widest rect out of those that this range produced
         .max_by(|x, y| x.width().partial_cmp(&y.width()).unwrap())
+}
+
+/// Builds a vec of layout sections from the given iterator of ranges
+fn build_layout_sections(
+    section_indexes: &mut [usize],
+    ranges: impl ExactSizeIterator<Item = (usize, Range<usize>)>,
+    font_id: FontId,
+    colors: &[Color32],
+) -> Vec<LayoutSection> {
+    // This is a lower bound for how many sections there will be, as each range will have at least 1 section,
+    // but gaps between ranges or ranges that overlap will result in multiple additional sections
+    // Technically there can be less sections than this if some ranges are entirely 'covered' by other ranges,
+    // but that is very unlikely, if not impossible, due to how regular expressions are structured
+    let mut sections = Vec::with_capacity(ranges.len());
+
+    // Mark each byte of the string with the index it corresponds to
+    for (index, range) in ranges {
+        section_indexes[range].fill(index + 1);
+    }
+
+    // Derived from the `Slice::group_by` method;
+    // Find consecutive runs of bytes with equal marked indexes, and create a layout section for each run
+    let mut head = 0;
+    let mut len = 1;
+    let mut iter = section_indexes.windows(2);
+    while let Some(&[left, right]) = iter.next() {
+        if left != right {
+            sections.push(LayoutSection {
+                leading_space: 0.0,
+                byte_range: head..len,
+                format: TextFormat::background(font_id.clone(), colors[left]),
+            });
+
+            head = len;
+        }
+        len += 1;
+    }
+
+    let i = section_indexes[head];
+    sections.push(LayoutSection {
+        leading_space: 0.0,
+        byte_range: head..len,
+        format: TextFormat::background(font_id, colors[i]),
+    });
+
+    sections
 }
