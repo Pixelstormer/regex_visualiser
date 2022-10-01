@@ -3,7 +3,7 @@ mod menu_bar;
 
 use self::about::about;
 use self::menu_bar::menu_bar;
-use super::{editor::editor, tab_bar::tab_bar};
+use super::{editor::editor, inspector::inspector, tab_bar::tab_bar};
 use crate::app::state::AppState;
 use egui::Context;
 
@@ -16,6 +16,7 @@ pub fn root(ctx: &Context, state: &mut AppState, close_fn: impl FnOnce()) {
         about(ctx, state);
     } else {
         tab_bar(ctx, state);
+        inspector(ctx, state);
         editor(ctx, state);
     }
 }

@@ -65,10 +65,52 @@ impl Default for WidgetState {
 
 pub type LogicResult = Result<LogicState, RegexError>;
 
+#[derive(Default)]
+pub struct MatchesSelector {
+    pub selected: usize,
+    pub matches: Vec<String>,
+}
+
+impl MatchesSelector {
+    pub fn new(matches: Vec<String>) -> Self {
+        Self {
+            selected: 0,
+            matches,
+        }
+    }
+
+    pub fn create_from_regex(regex: &Regex, input_text: &str) -> Self {
+        let captures = regex
+            .captures_iter(input_text)
+            .map(|captures| captures.get(0).unwrap().as_str().replace('\n', "\\n"))
+            .collect();
+
+        Self::new(captures)
+    }
+
+    pub fn dec(&mut self) {
+        self.selected = self
+            .selected
+            .checked_sub(1)
+            .unwrap_or(self.matches.len() - 1);
+    }
+
+    pub fn inc(&mut self) {
+        self.selected = (self.selected + 1)
+            .checked_rem(self.matches.len())
+            .unwrap_or(self.selected);
+    }
+
+    pub fn current(&self) -> Option<&str> {
+        self.matches.get(self.selected).map(String::as_str)
+    }
+}
+
 /// State for application logic
 pub struct LogicState {
     pub ast: Ast,
     pub regex: Regex,
+    pub matches: MatchesSelector,
     pub regex_layout: RegexLayout,
     pub input_layout: MatchedTextLayout,
 }
@@ -81,6 +123,7 @@ impl Default for LogicState {
         Self {
             ast: EMPTY_REGEX.0.clone(),
             regex: EMPTY_REGEX.1.clone(),
+            matches: Default::default(),
             regex_layout: Default::default(),
             input_layout: Default::default(),
         }
@@ -97,6 +140,10 @@ impl LogicState {
         previous_state: Option<&Self>,
     ) -> LogicResult {
         compile_regex(pattern).map(|(ast, regex)| {
+            let input_text = input_text.to_string();
+
+            let matches = MatchesSelector::create_from_regex(&regex, &input_text);
+
             let regex_layout = regex_parse_ast(
                 regex_text.to_string(),
                 &ast,
@@ -105,7 +152,7 @@ impl LogicState {
             );
 
             let input_layout = layout_matched_text(
-                input_text.to_string(),
+                input_text,
                 &regex,
                 style,
                 &regex_layout.capture_group_colors,
@@ -114,6 +161,7 @@ impl LogicState {
             Self {
                 ast,
                 regex,
+                matches,
                 regex_layout,
                 input_layout,
             }

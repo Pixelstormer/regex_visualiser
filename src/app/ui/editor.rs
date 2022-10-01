@@ -1,6 +1,9 @@
-use crate::app::shape::{curve_between, Orientation};
 use crate::app::state::{AppState, LogicState};
 use crate::app::text::{glyph_bounds, layout_matched_text, layout_plain_text, layout_regex_err};
+use crate::app::{
+    shape::{curve_between, Orientation},
+    state::MatchesSelector,
+};
 use egui::{
     layers::ShapeIdx, text_edit::TextEditOutput, Align, CentralPanel, Color32, Context, Frame,
     Layout, Response, RichText, ScrollArea, Shape, Stroke, TextEdit, Ui, Vec2,
@@ -144,6 +147,8 @@ fn input_editor(ui: &mut Ui, state: &mut AppState, idx: &mut Option<ShapeIdx>) -
                                 ui.style(),
                                 &logic.regex_layout.capture_group_colors,
                             );
+
+                            logic.matches = MatchesSelector::create_from_regex(&logic.regex, text);
                         }
                     }
                     input_changed = true;

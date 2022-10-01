@@ -1,4 +1,5 @@
 mod editor;
+mod inspector;
 mod tab_bar;
 
 /// Functions for displaying UI specific to a native build of the app
