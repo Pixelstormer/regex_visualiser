@@ -51,6 +51,16 @@ impl<T> LoopVec<T> {
         self.index
     }
 
+    /// Attempts to set the current index directly to the given new index, failing if the new index is invalid
+    pub fn try_set_index(&mut self, new_index: usize) -> bool {
+        if new_index >= self.vec.len() {
+            false
+        } else {
+            self.index = new_index;
+            true
+        }
+    }
+
     /// Increments the current index, looping around to 0 if incrementing exceeds the bounds of the vec
     pub fn inc(&mut self) {
         self.index = (self.index + 1)

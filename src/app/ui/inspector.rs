@@ -1,5 +1,5 @@
 use crate::app::{state::AppState, text::layout_regex_err};
-use egui::{Color32, Context, Frame, Grid, SidePanel, Stroke, TextEdit, Ui};
+use egui::{Color32, ComboBox, Context, Frame, Grid, SidePanel, Stroke, TextEdit, Ui};
 
 /// Adds a container that displays an inspector that provides detailed breakdowns of the regex and its matches
 pub fn inspector(ctx: &Context, state: &mut AppState) {
@@ -48,50 +48,70 @@ fn matches(ui: &mut Ui, state: &mut AppState) {
         return;
     };
 
-    let matches = &mut selector.matches;
+    Grid::new("inspector").show(ui, |ui| {
+        let matches = &mut selector.matches;
 
-    Grid::new("inspector").num_columns(2).show(ui, |ui| {
         ui.label("Whole Matches");
-        ui.horizontal(|ui| {
-            if ui.button("<").clicked() {
-                matches.dec();
-            }
+        if ui.button("<").clicked() {
+            matches.dec();
+        }
 
-            if matches.is_empty() {
-                ui.label("-/-");
-            } else {
-                ui.label(format!("{}/{}", matches.index() + 1, matches.len()));
-            }
+        if matches.is_empty() {
+            ui.label("-/-");
+        } else {
+            ui.label(format!("{}/{}", matches.index() + 1, matches.len()));
+        }
 
-            if ui.button(">").clicked() {
-                matches.inc();
-            }
-        });
+        if ui.button(">").clicked() {
+            matches.inc();
+        }
 
         ui.end_row();
 
         let mut groups = matches.get_current_mut();
 
         ui.label("Capture Groups");
-        ui.horizontal(|ui| {
-            if ui.button("<").clicked() {
-                if let Some(ref mut groups) = groups {
-                    groups.dec();
-                }
+        if ui.button("<").clicked() {
+            if let Some(ref mut groups) = groups {
+                groups.dec();
             }
+        }
 
-            if let Some(groups) = groups.as_ref().filter(|groups| !groups.is_empty()) {
-                ui.label(format!("{}/{}", groups.index() + 1, groups.len()));
-            } else {
-                ui.label("-/-");
+        if let Some(groups) = groups.as_ref().filter(|groups| !groups.is_empty()) {
+            ui.label(format!("{}/{}", groups.index() + 1, groups.len()));
+        } else {
+            ui.label("-/-");
+        }
+
+        if ui.button(">").clicked() {
+            if let Some(ref mut groups) = groups {
+                groups.inc();
             }
+        }
 
-            if ui.button(">").clicked() {
+        ComboBox::from_id_source("combobox")
+            .selected_text(
+                groups
+                    .as_ref()
+                    .and_then(|groups| groups.get_current())
+                    .and_then(|(_, name)| name.as_deref())
+                    .unwrap_or_default(),
+            )
+            .show_ui(ui, |ui| {
                 if let Some(groups) = groups {
-                    groups.inc();
+                    let mut new_index = groups.index();
+                    for (index, name) in groups
+                        .iter()
+                        .enumerate()
+                        .filter_map(|(index, (_, name))| Some(index).zip(name.as_ref()))
+                    {
+                        ui.selectable_value(&mut new_index, index, name);
+                    }
+                    groups.try_set_index(new_index);
                 }
-            }
-        });
+            });
+
+        ui.end_row();
     });
 
     Frame::canvas(ui.style()).show(ui, |ui| {

@@ -72,7 +72,7 @@ pub type LogicResult = Result<LogicState, RegexError>;
 #[derive(Default)]
 pub struct MatchesSelector {
     text: String,
-    pub matches: LoopVec<LoopVec<Range<usize>>>,
+    pub matches: LoopVec<LoopVec<(Range<usize>, Option<String>)>>,
 }
 
 impl MatchesSelector {
@@ -82,7 +82,10 @@ impl MatchesSelector {
             .map(|captures| {
                 captures
                     .iter()
-                    .filter_map(|r#match| r#match.map(|r#match| r#match.range()))
+                    .zip(regex.capture_names())
+                    .filter_map(|(r#match, name)| {
+                        r#match.map(|r#match| (r#match.range(), name.map(|name| name.into())))
+                    })
                     .collect()
             })
             .collect();
@@ -92,7 +95,7 @@ impl MatchesSelector {
 
     pub fn current_str(&self) -> Option<&str> {
         self.text
-            .get(self.matches.get_current()?.get_current()?.clone())
+            .get(self.matches.get_current()?.get_current()?.0.clone())
     }
 }
 
