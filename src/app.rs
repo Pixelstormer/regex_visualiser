@@ -1,4 +1,5 @@
 mod color;
+mod loop_vec;
 mod parsing;
 mod shape;
 mod state;

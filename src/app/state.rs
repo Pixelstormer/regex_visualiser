@@ -1,9 +1,13 @@
-use super::parsing::{compile_regex, RegexError};
 use super::text::{layout_matched_text, regex_parse_ast, MatchedTextLayout, RegexLayout};
+use super::{
+    loop_vec::LoopVec,
+    parsing::{compile_regex, RegexError},
+};
 use egui::Style;
 use lazy_static::lazy_static;
 use regex::Regex;
 use regex_syntax::ast::Ast;
+use std::ops::Range;
 
 /// State for the application as a whole
 pub struct AppState {
@@ -67,42 +71,30 @@ pub type LogicResult = Result<LogicState, RegexError>;
 
 #[derive(Default)]
 pub struct MatchesSelector {
-    pub selected: usize,
-    pub matches: Vec<String>,
+    text: String,
+    pub matches: LoopVec<LoopVec<Range<usize>>>,
 }
 
 impl MatchesSelector {
-    pub fn new(matches: Vec<String>) -> Self {
-        Self {
-            selected: 0,
-            matches,
-        }
-    }
-
     pub fn create_from_regex(regex: &Regex, input_text: &str) -> Self {
-        let captures = regex
+        let text = input_text.replace('\n', "\\n");
+
+        let matches = regex
             .captures_iter(input_text)
-            .map(|captures| captures.get(0).unwrap().as_str().replace('\n', "\\n"))
+            .map(|captures| {
+                captures
+                    .iter()
+                    .filter_map(|r#match| r#match.map(|r#match| r#match.range()))
+                    .collect()
+            })
             .collect();
 
-        Self::new(captures)
+        Self { text, matches }
     }
 
-    pub fn dec(&mut self) {
-        self.selected = self
-            .selected
-            .checked_sub(1)
-            .unwrap_or(self.matches.len() - 1);
-    }
-
-    pub fn inc(&mut self) {
-        self.selected = (self.selected + 1)
-            .checked_rem(self.matches.len())
-            .unwrap_or(self.selected);
-    }
-
-    pub fn current(&self) -> Option<&str> {
-        self.matches.get(self.selected).map(String::as_str)
+    pub fn current_str(&self) -> Option<&str> {
+        self.text
+            .get(self.matches.get_current()?.get_current()?.clone())
     }
 }
 
@@ -110,7 +102,7 @@ impl MatchesSelector {
 pub struct LogicState {
     pub ast: Ast,
     pub regex: Regex,
-    pub matches: MatchesSelector,
+    pub selector: MatchesSelector,
     pub regex_layout: RegexLayout,
     pub input_layout: MatchedTextLayout,
 }
@@ -123,7 +115,7 @@ impl Default for LogicState {
         Self {
             ast: EMPTY_REGEX.0.clone(),
             regex: EMPTY_REGEX.1.clone(),
-            matches: Default::default(),
+            selector: Default::default(),
             regex_layout: Default::default(),
             input_layout: Default::default(),
         }
@@ -142,7 +134,7 @@ impl LogicState {
         compile_regex(pattern).map(|(ast, regex)| {
             let input_text = input_text.to_string();
 
-            let matches = MatchesSelector::create_from_regex(&regex, &input_text);
+            let selector = MatchesSelector::create_from_regex(&regex, &input_text);
 
             let regex_layout = regex_parse_ast(
                 regex_text.to_string(),
@@ -161,7 +153,7 @@ impl LogicState {
             Self {
                 ast,
                 regex,
-                matches,
+                selector,
                 regex_layout,
                 input_layout,
             }

@@ -1,5 +1,5 @@
 use crate::app::{state::AppState, text::layout_regex_err};
-use egui::{Color32, Context, Frame, SidePanel, Stroke, TextEdit, Ui};
+use egui::{Color32, Context, Frame, Grid, SidePanel, Stroke, TextEdit, Ui};
 
 /// Adds a container that displays an inspector that provides detailed breakdowns of the regex and its matches
 pub fn inspector(ctx: &Context, state: &mut AppState) {
@@ -42,31 +42,61 @@ fn regular_expression(ui: &mut Ui, state: &AppState) {
 }
 
 fn matches(ui: &mut Ui, state: &mut AppState) {
-    let matches = if let Ok(logic) = &mut state.logic {
-        &mut logic.matches
+    let selector = if let Ok(logic) = &mut state.logic {
+        &mut logic.selector
     } else {
         return;
     };
 
-    ui.label("Matches");
+    let matches = &mut selector.matches;
 
-    ui.horizontal(|ui| {
-        if ui.button("<").clicked() {
-            matches.dec();
-        }
+    Grid::new("inspector").num_columns(2).show(ui, |ui| {
+        ui.label("Whole Matches");
+        ui.horizontal(|ui| {
+            if ui.button("<").clicked() {
+                matches.dec();
+            }
 
-        ui.label(format!(
-            "{}/{}",
-            (matches.selected + 1).min(matches.matches.len()),
-            matches.matches.len()
-        ));
+            if matches.is_empty() {
+                ui.label("-/-");
+            } else {
+                ui.label(format!("{}/{}", matches.index() + 1, matches.len()));
+            }
 
-        if ui.button(">").clicked() {
-            matches.inc();
-        }
+            if ui.button(">").clicked() {
+                matches.inc();
+            }
+        });
+
+        ui.end_row();
+
+        let mut groups = matches.get_current_mut();
+
+        ui.label("Capture Groups");
+        ui.horizontal(|ui| {
+            if ui.button("<").clicked() {
+                if let Some(ref mut groups) = groups {
+                    groups.dec();
+                }
+            }
+
+            if let Some(groups) = groups.as_ref().filter(|groups| !groups.is_empty()) {
+                ui.label(format!("{}/{}", groups.index() + 1, groups.len()));
+            } else {
+                ui.label("-/-");
+            }
+
+            if ui.button(">").clicked() {
+                if let Some(groups) = groups {
+                    groups.inc();
+                }
+            }
+        });
     });
 
     Frame::canvas(ui.style()).show(ui, |ui| {
-        TextEdit::singleline(&mut matches.current().unwrap_or("")).show(ui);
+        TextEdit::singleline(&mut selector.current_str().unwrap_or(""))
+            .desired_width(f32::INFINITY)
+            .show(ui);
     });
 }

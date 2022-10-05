@@ -148,7 +148,7 @@ fn input_editor(ui: &mut Ui, state: &mut AppState, idx: &mut Option<ShapeIdx>) -
                                 &logic.regex_layout.capture_group_colors,
                             );
 
-                            logic.matches = MatchesSelector::create_from_regex(&logic.regex, text);
+                            logic.selector = MatchesSelector::create_from_regex(&logic.regex, text);
                         }
                     }
                     input_changed = true;
