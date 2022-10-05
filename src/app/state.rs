@@ -76,11 +76,9 @@ pub struct MatchesSelector {
 }
 
 impl MatchesSelector {
-    pub fn create_from_regex(regex: &Regex, input_text: &str) -> Self {
-        let text = input_text.replace('\n', "\\n");
-
+    pub fn create_from_regex(regex: &Regex, text: String) -> Self {
         let matches = regex
-            .captures_iter(input_text)
+            .captures_iter(&text)
             .map(|captures| {
                 captures
                     .iter()
@@ -134,7 +132,7 @@ impl LogicState {
         compile_regex(pattern).map(|(ast, regex)| {
             let input_text = input_text.to_string();
 
-            let selector = MatchesSelector::create_from_regex(&regex, &input_text);
+            let selector = MatchesSelector::create_from_regex(&regex, input_text.clone());
 
             let regex_layout = regex_parse_ast(
                 regex_text.to_string(),

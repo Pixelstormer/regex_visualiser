@@ -95,7 +95,7 @@ fn matches(ui: &mut Ui, state: &mut AppState) {
     });
 
     Frame::canvas(ui.style()).show(ui, |ui| {
-        TextEdit::singleline(&mut selector.current_str().unwrap_or(""))
+        TextEdit::singleline(&mut selector.current_str().unwrap_or("").replace('\n', "\\n"))
             .desired_width(f32::INFINITY)
             .show(ui);
     });
