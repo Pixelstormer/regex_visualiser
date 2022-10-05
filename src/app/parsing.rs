@@ -1,6 +1,6 @@
 use super::text::GetRangeExt;
 use regex::Regex;
-use regex_syntax::ast::{parse::Parser, Ast};
+use regex_syntax::ast::{parse::Parser, Alternation, Ast, Concat};
 use std::{
     fmt::{Display, Formatter},
     ops::Range,
@@ -61,8 +61,9 @@ pub fn ast_find_capture_groups(ast: &Ast) -> (Vec<usize>, Vec<Range<usize>>) {
                     stack.push((depth + 1, &group.ast))
                 }
             }
-            Ast::Alternation(alt) => stack.extend(alt.asts.iter().map(|ast| (depth + 1, ast))),
-            Ast::Concat(concat) => stack.extend(concat.asts.iter().map(|ast| (depth + 1, ast))),
+            Ast::Alternation(Alternation { asts, .. }) | Ast::Concat(Concat { asts, .. }) => {
+                stack.extend(asts.iter().rev().map(|ast| (depth + 1, ast)))
+            }
             _ => {}
         }
     }
