@@ -1,4 +1,7 @@
-use crate::app::{state::AppState, text::layout_regex_err};
+use crate::app::{
+    state::AppState,
+    text::{layout_plain_text, layout_regex_err, layout_singleline_substring},
+};
 use egui::{Color32, ComboBox, Context, Frame, Grid, SidePanel, Stroke, TextEdit, Ui};
 
 /// Adds a container that displays an inspector that provides detailed breakdowns of the regex and its matches
@@ -42,11 +45,13 @@ fn regular_expression(ui: &mut Ui, state: &AppState) {
 }
 
 fn matches(ui: &mut Ui, state: &mut AppState) {
-    let selector = if let Ok(logic) = &mut state.logic {
-        &mut logic.selector
+    let logic = if let Ok(logic) = &mut state.logic {
+        logic
     } else {
         return;
     };
+
+    let selector = &mut logic.selector;
 
     Grid::new("inspector").show(ui, |ui| {
         let matches = &mut selector.matches;
@@ -115,8 +120,18 @@ fn matches(ui: &mut Ui, state: &mut AppState) {
     });
 
     Frame::canvas(ui.style()).show(ui, |ui| {
-        TextEdit::singleline(&mut selector.current_str().unwrap_or("").replace('\n', "\\n"))
+        TextEdit::singleline(&mut selector.text.as_str())
             .desired_width(f32::INFINITY)
+            .layouter(&mut |ui, text, wrap_width| {
+                let sections = &logic.input_layout.job.sections;
+                let mut layout_job = selector
+                    .current_range()
+                    .and_then(|range| layout_singleline_substring(text, range, sections))
+                    .unwrap_or_else(|| layout_plain_text(text.to_owned(), ui.style()));
+
+                layout_job.wrap.max_width = wrap_width;
+                ui.fonts().layout_job(layout_job)
+            })
             .show(ui);
     });
 }

@@ -352,3 +352,57 @@ fn build_layout_sections(
 
     sections
 }
+
+/// Lays out the substring of the given text as specified by the given range,
+/// replacing newline chars with `\n` to truncate it to a single line,
+/// and modifying the given layout sections accordingly
+///
+/// Returns None if the given range is out of bounds of the given string
+pub fn layout_singleline_substring(
+    text: &str,
+    range: &Range<usize>,
+    sections: &[LayoutSection],
+) -> Option<LayoutJob> {
+    let substring = text.get(range.clone())?;
+
+    let sections = sections
+        .iter()
+        .filter_map(|section| {
+            let mut byte_range =
+                section.byte_range.start.max(range.start)..section.byte_range.end.min(range.end);
+
+            (!byte_range.is_empty()).then(|| {
+                byte_range.start -= range.start;
+                byte_range.end -= range.start;
+
+                // Newline chars get replaced with the `\` and `n` chars, effectively adding 1 char for each newline
+                // So offset the byte ranges to account for these additions
+                let start_offset = substring[..byte_range.start]
+                    .bytes()
+                    .filter(|&b| b == b'\n')
+                    .count();
+
+                let end_offset = start_offset
+                    + substring[byte_range.clone()]
+                        .bytes()
+                        .filter(|&b| b == b'\n')
+                        .count();
+
+                byte_range.start += start_offset;
+                byte_range.end += end_offset;
+
+                LayoutSection {
+                    leading_space: section.leading_space,
+                    byte_range,
+                    format: section.format.clone(),
+                }
+            })
+        })
+        .collect();
+
+    Some(LayoutJob {
+        text: substring.replace('\n', "\\n"),
+        sections,
+        ..Default::default()
+    })
+}
