@@ -55,7 +55,7 @@ fn matches(ui: &mut Ui, state: &mut AppState) {
 
     let selector = &mut logic.selector;
 
-    Grid::new("inspector").show(ui, |ui| {
+    Grid::new("inspector").num_columns(5).show(ui, |ui| {
         let matches = &mut selector.matches;
 
         ui.label("Whole Matches");
@@ -72,6 +72,8 @@ fn matches(ui: &mut Ui, state: &mut AppState) {
         if ui.button(">").clicked() {
             matches.inc();
         }
+
+        ui.label("Named groups");
 
         ui.end_row();
 
