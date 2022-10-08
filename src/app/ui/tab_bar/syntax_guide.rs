@@ -1,6 +1,5 @@
 use egui::{
-    text::LayoutJob, CollapsingHeader, FontId, FontSelection, Grid, ScrollArea, TextFormat,
-    TextStyle, Ui,
+    text::LayoutJob, CollapsingHeader, FontId, Grid, ScrollArea, TextFormat, TextStyle, Ui,
 };
 
 /// Displays a guide to regular expression syntax
@@ -18,7 +17,7 @@ pub fn syntax_guide(ui: &mut Ui) {
             ui.label(")");
         });
 
-        let monospace = FontSelection::from(TextStyle::Monospace).resolve(ui.style());
+        let monospace = TextStyle::Monospace.resolve(ui.style());
         matching_one_character(ui, monospace.clone());
         character_classes(ui, monospace.clone());
         composites(ui);

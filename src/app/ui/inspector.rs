@@ -3,8 +3,7 @@ use crate::app::{
     text::{layout_plain_text, layout_regex_err},
 };
 use egui::{
-    Color32, ComboBox, Context, FontSelection, Frame, Grid, SidePanel, Stroke, TextEdit,
-    TextFormat, TextStyle, Ui,
+    Color32, ComboBox, Context, Frame, Grid, SidePanel, Stroke, TextEdit, TextFormat, TextStyle, Ui,
 };
 
 /// Adds a container that displays an inspector that provides detailed breakdowns of the regex and its matches
@@ -130,7 +129,7 @@ fn matches(ui: &mut Ui, state: &mut AppState) {
                     .current_range()
                     .map(|range| {
                         let mut job = logic.input_layout.job.substring(range.clone());
-                        let font_id = FontSelection::from(TextStyle::Monospace).resolve(ui.style());
+                        let font_id = TextStyle::Monospace.resolve(ui.style());
                         job.replace_format('\n', TextFormat::simple(font_id, Color32::DARK_GRAY));
                         job.replace(b'\n', "\\n");
                         job.convert_to_layout_job()

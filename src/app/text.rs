@@ -6,7 +6,7 @@ use super::{
 use eframe::epaint::text::Row;
 use egui::{
     text::{LayoutJob, LayoutSection},
-    Color32, FontId, FontSelection, Rect, Style, TextFormat, TextStyle,
+    Color32, FontId, Rect, Style, TextFormat, TextStyle,
 };
 use regex::Regex;
 use regex_syntax::ast::{Ast, Span};
@@ -156,8 +156,6 @@ pub fn regex_parse_ast(
     // Find the spans of each of the capture groups in the regular expression
     let (depths, ranges) = ast_find_capture_groups(ast);
 
-    let font_id = FontSelection::from(TextStyle::Monospace).resolve(style);
-
     // Calculate the color that each capture group will have
     // Capture groups are 1-indexed, so prepend a placeholder color for the 0th index
     let capture_group_colors = std::iter::once(Color32::TRANSPARENT)
@@ -172,7 +170,7 @@ pub fn regex_parse_ast(
     let sections = build_layout_sections(
         &mut vec![0; regex.len()],
         ranges.iter().cloned().enumerate(),
-        font_id,
+        TextStyle::Monospace.resolve(style),
         &capture_group_colors,
     );
 
@@ -205,8 +203,6 @@ pub fn regex_parse_ast(
 
 /// Returns information about how a malformed regular expression string should be rendered
 pub fn layout_regex_err(regex: String, style: &Style, err: &RegexError) -> RegexLayout {
-    let font_id = FontSelection::from(TextStyle::Monospace).resolve(style);
-
     let (span, aux) = match err {
         RegexError::Parse(e) => (Some(e.span()), e.auxiliary_span()),
         RegexError::Compile(_) => (None, None),
@@ -232,6 +228,8 @@ pub fn layout_regex_err(regex: String, style: &Style, err: &RegexError) -> Regex
             },
         }
     }
+
+    let font_id = TextStyle::Monospace.resolve(style);
 
     let sections = match (span, aux) {
         (None, _) => vec![highlight(0..regex.len(), font_id)],
@@ -319,12 +317,12 @@ pub fn layout_matched_text(
         ranges.extend(iter);
     }
 
-    let font_id = FontSelection::from(TextStyle::Monospace).resolve(style);
-
     let mut section_indexes = vec![0; text.len()];
     for (index, range) in ranges {
         section_indexes[range].fill(index);
     }
+
+    let font_id = TextStyle::Monospace.resolve(style);
 
     MatchedTextLayout {
         job: TextLayoutJob::new(
@@ -345,7 +343,7 @@ pub fn layout_plain_text_job(text: String, style: &Style) -> TextLayoutJob {
         text,
         vec![0; len],
         vec![TextFormat {
-            font_id: FontSelection::from(TextStyle::Monospace).resolve(style),
+            font_id: TextStyle::Monospace.resolve(style),
             ..Default::default()
         }],
     )
@@ -356,7 +354,7 @@ pub fn layout_plain_text(text: String, style: &Style) -> LayoutJob {
     LayoutJob::single_section(
         text,
         TextFormat {
-            font_id: FontSelection::from(TextStyle::Monospace).resolve(style),
+            font_id: TextStyle::Monospace.resolve(style),
             ..Default::default()
         },
     )
