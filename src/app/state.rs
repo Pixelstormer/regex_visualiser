@@ -1,4 +1,4 @@
-use super::text::{layout_matched_text, regex_parse_ast, MatchedTextLayout, RegexLayout};
+use super::text::{layout_matched_text, layout_regex, MatchedTextLayout, RegexLayout};
 use super::{
     loop_vec::LoopVec,
     parsing::{compile_regex, RegexError},
@@ -140,7 +140,7 @@ impl LogicState {
 
             let selector = MatchesSelector::create_from_regex(&regex, input_text.clone());
 
-            let regex_layout = regex_parse_ast(
+            let regex_layout = layout_regex(
                 regex_text.to_string(),
                 &ast,
                 style,

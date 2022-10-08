@@ -131,11 +131,12 @@ fn matches(ui: &mut Ui, state: &mut AppState) {
                 let mut layout_job = selector
                     .current_range()
                     .map(|range| {
-                        let mut job = logic.input_layout.job.substring(range.clone());
+                        let mut formatting = logic.input_layout.formatting.substring(range.clone());
                         let font_id = TextStyle::Monospace.resolve(ui.style());
-                        job.replace_format('\n', TextFormat::simple(font_id, Color32::DARK_GRAY));
-                        job.replace(b'\n', "\\n");
-                        job.convert_to_layout_job()
+                        formatting
+                            .replace_format('\n', TextFormat::simple(font_id, Color32::DARK_GRAY));
+                        formatting.replace(b'\n', "\\n");
+                        formatting.convert_to_layout_job()
                     })
                     .unwrap_or_else(|| layout_plain_text(text.to_owned(), ui.style()));
 

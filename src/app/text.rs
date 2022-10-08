@@ -36,14 +36,15 @@ fn str_glyph_count(text: &str) -> usize {
     text.chars().count() - text.matches('\n').count()
 }
 
+/// A mapping of bytes in a string to corresponding TextFormats, not yet converted to a full LayoutJob
 #[derive(Default, Clone)]
-pub struct TextLayoutJob {
+pub struct TextFormatMapping {
     text: String,
     mapping: Vec<usize>,
     formats: Vec<TextFormat>,
 }
 
-impl TextLayoutJob {
+impl TextFormatMapping {
     pub fn new(text: String, mapping: Vec<usize>, formats: Vec<TextFormat>) -> Self {
         Self {
             text,
@@ -52,6 +53,7 @@ impl TextLayoutJob {
         }
     }
 
+    /// Create a new TextFormatMapping by cloning the substring corresponding to the given range
     pub fn substring(&self, range: Range<usize>) -> Self {
         Self {
             text: self.text[range.clone()].into(),
@@ -60,6 +62,7 @@ impl TextLayoutJob {
         }
     }
 
+    /// Replace all instances of the given char (Encoded as a byte) with the given string
     pub fn replace(&mut self, from: u8, to: &str) {
         let from: char = from.into();
 
@@ -76,6 +79,7 @@ impl TextLayoutJob {
         self.text = self.text.replace(from, to);
     }
 
+    /// Set the formatting for all instances of the given char to the given TextFormat
     pub fn replace_format(&mut self, pattern: char, format: TextFormat) {
         let new_index = self.formats.len();
         self.formats.push(format);
@@ -143,7 +147,7 @@ pub struct RegexLayout {
     pub capture_group_colors: Vec<Color32>,
 }
 
-pub fn regex_parse_ast(
+pub fn layout_regex(
     regex: String,
     ast: &Ast,
     style: &Style,
@@ -266,8 +270,8 @@ pub fn layout_regex_err(regex: String, style: &Style, err: &RegexError) -> Regex
 /// Information about how text that was matched against a regex should be rendered
 #[derive(Default)]
 pub struct MatchedTextLayout {
-    /// The layout job describing how to render the matched text
-    pub job: TextLayoutJob,
+    /// The format mapping describing how to render the matched text
+    pub formatting: TextFormatMapping,
     /// A vec of mappings from the indexes of capture groups in the regex to the parts of the text that were
     /// matched by that capture group, with one mapping for each overall match in the text
     pub capture_group_chars: Vec<Vec<Option<Range<usize>>>>,
@@ -285,7 +289,7 @@ pub fn layout_matched_text(
 
     if regex.as_str().is_empty() {
         return MatchedTextLayout {
-            job: layout_plain_text_job(text, style),
+            formatting: format_plain_text(text, style),
             capture_group_chars: vec![],
         };
     }
@@ -325,7 +329,7 @@ pub fn layout_matched_text(
     let font_id = TextStyle::Monospace.resolve(style);
 
     MatchedTextLayout {
-        job: TextLayoutJob::new(
+        formatting: TextFormatMapping::new(
             text,
             section_indexes,
             capture_group_colors
@@ -337,9 +341,10 @@ pub fn layout_matched_text(
     }
 }
 
-pub fn layout_plain_text_job(text: String, style: &Style) -> TextLayoutJob {
+/// Returns information about how plain text should be rendered
+pub fn format_plain_text(text: String, style: &Style) -> TextFormatMapping {
     let len = text.len();
-    TextLayoutJob::new(
+    TextFormatMapping::new(
         text,
         vec![0; len],
         vec![TextFormat {
