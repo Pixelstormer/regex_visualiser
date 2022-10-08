@@ -19,6 +19,7 @@ pub fn inspector_ui(ui: &mut Ui, state: &mut AppState) {
     ui.separator();
 
     regular_expression(ui, state);
+    ui.add_space(16.0);
     matches(ui, state);
 }
 
