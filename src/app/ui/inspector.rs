@@ -2,7 +2,10 @@ use crate::app::{
     state::AppState,
     text::{layout_plain_text, layout_regex_err},
 };
-use egui::{Color32, ComboBox, Context, Frame, Grid, SidePanel, Stroke, TextEdit, Ui};
+use egui::{
+    Color32, ComboBox, Context, FontSelection, Frame, Grid, SidePanel, Stroke, TextEdit,
+    TextFormat, TextStyle, Ui,
+};
 
 /// Adds a container that displays an inspector that provides detailed breakdowns of the regex and its matches
 pub fn inspector(ctx: &Context, state: &mut AppState) {
@@ -126,12 +129,11 @@ fn matches(ui: &mut Ui, state: &mut AppState) {
                 let mut layout_job = selector
                     .current_range()
                     .map(|range| {
-                        logic
-                            .input_layout
-                            .job
-                            .substring(range.clone())
-                            .replace(b'\n', "\\n")
-                            .convert_to_layout_job()
+                        let mut job = logic.input_layout.job.substring(range.clone());
+                        let font_id = FontSelection::from(TextStyle::Monospace).resolve(ui.style());
+                        job.replace_format('\n', TextFormat::simple(font_id, Color32::DARK_GRAY));
+                        job.replace(b'\n', "\\n");
+                        job.convert_to_layout_job()
                     })
                     .unwrap_or_else(|| layout_plain_text(text.to_owned(), ui.style()));
 

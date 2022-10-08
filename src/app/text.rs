@@ -60,13 +60,7 @@ impl TextLayoutJob {
         }
     }
 
-    pub fn replace(&self, from: u8, to: &str) -> Self {
-        let mut new = self.clone();
-        new.replace_inline(from, to);
-        new
-    }
-
-    pub fn replace_inline(&mut self, from: u8, to: &str) {
+    pub fn replace(&mut self, from: u8, to: &str) {
         let from: char = from.into();
 
         let mut offset = 0;
@@ -80,6 +74,14 @@ impl TextLayoutJob {
         }
 
         self.text = self.text.replace(from, to);
+    }
+
+    pub fn replace_format(&mut self, pattern: char, format: TextFormat) {
+        let new_index = self.formats.len();
+        self.formats.push(format);
+        for (index, _) in self.text.match_indices(pattern) {
+            self.mapping[index] = new_index;
+        }
     }
 
     pub fn convert_to_layout_job(self) -> LayoutJob {
