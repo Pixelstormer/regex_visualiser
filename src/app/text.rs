@@ -36,6 +36,99 @@ fn str_glyph_count(text: &str) -> usize {
     text.chars().count() - text.matches('\n').count()
 }
 
+#[derive(Default, Clone)]
+pub struct TextLayoutJob {
+    text: String,
+    mapping: Vec<usize>,
+    formats: Vec<TextFormat>,
+}
+
+impl TextLayoutJob {
+    pub fn new(text: String, mapping: Vec<usize>, formats: Vec<TextFormat>) -> Self {
+        Self {
+            text,
+            mapping,
+            formats,
+        }
+    }
+
+    pub fn substring(&self, range: Range<usize>) -> Self {
+        Self {
+            text: self.text[range.clone()].into(),
+            mapping: self.mapping[range].into(),
+            formats: self.formats.clone(),
+        }
+    }
+
+    pub fn replace(&self, from: u8, to: &str) -> Self {
+        let mut new = self.clone();
+        new.replace_inline(from, to);
+        new
+    }
+
+    pub fn replace_inline(&mut self, from: u8, to: &str) {
+        let from: char = from.into();
+
+        let mut offset = 0;
+        for (index, _) in self.text.match_indices(from) {
+            let index = index + offset;
+            self.mapping.splice(
+                index..=index,
+                std::iter::repeat(self.mapping[index]).take(to.len()),
+            );
+            offset += to.len() - 1;
+        }
+
+        self.text = self.text.replace(from, to);
+    }
+
+    pub fn convert_to_layout_job(self) -> LayoutJob {
+        let sections = self.build_layout_sections();
+        LayoutJob {
+            text: self.text,
+            sections,
+            ..Default::default()
+        }
+    }
+
+    fn build_layout_sections(&self) -> Vec<LayoutSection> {
+        // Empty strings have no layout sections
+        if self.text.is_empty() {
+            return Default::default();
+        }
+
+        // This is a lower bound for how many sections there will be, assuming that each TextFormat will be used at least once
+        let mut sections = Vec::with_capacity(self.formats.len());
+
+        // Derived from the `Slice::group_by` method;
+        // Find consecutive runs of bytes with equal marked indexes, and create a layout section for each run
+        let mut head = 0;
+        let mut len = 1;
+        let mut iter = self.mapping.windows(2);
+        while let Some(&[left, right]) = iter.next() {
+            if left != right {
+                sections.push(LayoutSection {
+                    leading_space: 0.0,
+                    byte_range: head..len,
+                    format: self.formats[left].clone(),
+                });
+
+                head = len;
+            }
+            len += 1;
+        }
+
+        let i = self.mapping[head];
+        sections.push(LayoutSection {
+            leading_space: 0.0,
+            byte_range: head..len,
+            format: self.formats[i].clone(),
+        });
+
+        sections
+    }
+}
+
 /// Information about how a regular expression should be rendered
 #[derive(Default)]
 pub struct RegexLayout {
@@ -174,7 +267,7 @@ pub fn layout_regex_err(regex: String, style: &Style, err: &RegexError) -> Regex
 #[derive(Default)]
 pub struct MatchedTextLayout {
     /// The layout job describing how to render the matched text
-    pub job: LayoutJob,
+    pub job: TextLayoutJob,
     /// A vec of mappings from the indexes of capture groups in the regex to the parts of the text that were
     /// matched by that capture group, with one mapping for each overall match in the text
     pub capture_group_chars: Vec<Vec<Option<Range<usize>>>>,
@@ -192,7 +285,7 @@ pub fn layout_matched_text(
 
     if regex.as_str().is_empty() {
         return MatchedTextLayout {
-            job: layout_plain_text(text, style),
+            job: layout_plain_text_job(text, style),
             capture_group_chars: vec![],
         };
     }
@@ -217,8 +310,8 @@ pub fn layout_matched_text(
         // Get the spans of the matched text from each capture group
         let iter = captures
             .iter()
-            .skip(1) // The first (0th) capture group always corresponds to the entire match, not any 'real' capture groups
             .enumerate()
+            .skip(1) // The first (0th) capture group always corresponds to the entire match, not any 'real' capture groups
             .filter_map(|(index, r#match)| r#match.map(|r#match| (index, r#match.range())));
 
         ranges.extend(iter);
@@ -226,21 +319,34 @@ pub fn layout_matched_text(
 
     let font_id = FontSelection::from(TextStyle::Monospace).resolve(style);
 
-    let sections = build_layout_sections(
-        &mut vec![0; text.len()],
-        ranges.into_iter(),
-        font_id,
-        capture_group_colors,
-    );
+    let mut section_indexes = vec![0; text.len()];
+    for (index, range) in ranges {
+        section_indexes[range].fill(index);
+    }
 
     MatchedTextLayout {
-        job: LayoutJob {
+        job: TextLayoutJob::new(
             text,
-            sections,
-            ..Default::default()
-        },
+            section_indexes,
+            capture_group_colors
+                .iter()
+                .map(|&color| TextFormat::background(font_id.clone(), color))
+                .collect(),
+        ),
         capture_group_chars,
     }
+}
+
+pub fn layout_plain_text_job(text: String, style: &Style) -> TextLayoutJob {
+    let len = text.len();
+    TextLayoutJob::new(
+        text,
+        vec![0; len],
+        vec![TextFormat {
+            font_id: FontSelection::from(TextStyle::Monospace).resolve(style),
+            ..Default::default()
+        }],
+    )
 }
 
 /// Returns information about how plain text should be rendered
@@ -351,58 +457,4 @@ fn build_layout_sections(
     });
 
     sections
-}
-
-/// Lays out the substring of the given text as specified by the given range,
-/// replacing newline chars with `\n` to truncate it to a single line,
-/// and modifying the given layout sections accordingly
-///
-/// Returns None if the given range is out of bounds of the given string
-pub fn layout_singleline_substring(
-    text: &str,
-    range: &Range<usize>,
-    sections: &[LayoutSection],
-) -> Option<LayoutJob> {
-    let substring = text.get(range.clone())?;
-
-    let sections = sections
-        .iter()
-        .filter_map(|section| {
-            let mut byte_range =
-                section.byte_range.start.max(range.start)..section.byte_range.end.min(range.end);
-
-            (!byte_range.is_empty()).then(|| {
-                byte_range.start -= range.start;
-                byte_range.end -= range.start;
-
-                // Newline chars get replaced with the `\` and `n` chars, effectively adding 1 char for each newline
-                // So offset the byte ranges to account for these additions
-                let start_offset = substring[..byte_range.start]
-                    .bytes()
-                    .filter(|&b| b == b'\n')
-                    .count();
-
-                let end_offset = start_offset
-                    + substring[byte_range.clone()]
-                        .bytes()
-                        .filter(|&b| b == b'\n')
-                        .count();
-
-                byte_range.start += start_offset;
-                byte_range.end += end_offset;
-
-                LayoutSection {
-                    leading_space: section.leading_space,
-                    byte_range,
-                    format: section.format.clone(),
-                }
-            })
-        })
-        .collect();
-
-    Some(LayoutJob {
-        text: substring.replace('\n', "\\n"),
-        sections,
-        ..Default::default()
-    })
 }

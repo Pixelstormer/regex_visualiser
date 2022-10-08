@@ -156,7 +156,7 @@ fn input_editor(ui: &mut Ui, state: &mut AppState, idx: &mut Option<ShapeIdx>) -
 
                     let mut layout_job = state.logic.as_ref().map_or_else(
                         |_| layout_plain_text(text.to_owned(), ui.style()),
-                        |state| state.input_layout.job.clone(),
+                        |state| state.input_layout.job.clone().convert_to_layout_job(),
                     );
                     layout_job.wrap.max_width = wrap_width;
                     ui.fonts().layout_job(layout_job)

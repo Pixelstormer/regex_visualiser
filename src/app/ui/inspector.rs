@@ -1,6 +1,6 @@
 use crate::app::{
     state::AppState,
-    text::{layout_plain_text, layout_regex_err, layout_singleline_substring},
+    text::{layout_plain_text, layout_regex_err},
 };
 use egui::{Color32, ComboBox, Context, Frame, Grid, SidePanel, Stroke, TextEdit, Ui};
 
@@ -120,13 +120,19 @@ fn matches(ui: &mut Ui, state: &mut AppState) {
     });
 
     Frame::canvas(ui.style()).show(ui, |ui| {
-        TextEdit::singleline(&mut selector.text.as_str())
+        TextEdit::singleline(&mut selector.current_str().unwrap_or_default())
             .desired_width(f32::INFINITY)
             .layouter(&mut |ui, text, wrap_width| {
-                let sections = &logic.input_layout.job.sections;
                 let mut layout_job = selector
                     .current_range()
-                    .and_then(|range| layout_singleline_substring(text, range, sections))
+                    .map(|range| {
+                        logic
+                            .input_layout
+                            .job
+                            .substring(range.clone())
+                            .replace(b'\n', "\\n")
+                            .convert_to_layout_job()
+                    })
                     .unwrap_or_else(|| layout_plain_text(text.to_owned(), ui.style()));
 
                 layout_job.wrap.max_width = wrap_width;
